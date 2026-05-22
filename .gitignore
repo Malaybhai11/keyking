@@ -1,0 +1,39 @@
+# Rust
+apps/desktop/src-tauri/target/
+*.rs.bk
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+*.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+venv/
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Key King specific
+vault.json
+*.key
+*.secret
