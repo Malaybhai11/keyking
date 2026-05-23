@@ -25,7 +25,7 @@ Zero-trust AI API aggregator with machine-fingerprint key vault, quota-aware rou
 
 ## How It Works
 
-1. **Zero-trust vault**: API keys encrypt with AES-256-GCM using a key derived from your machine's hardware fingerprint — never leaves your device.
+1. **Zero-trust vault**: API keys encrypt with AES-256-GCM using a key derived from your machine's hardware fingerprint.
 2. **Drop-in proxy**: Point any OpenAI client at `http://localhost:8787/v1` — no code changes needed.
 3. **Smart routing**: Automatically routes between providers based on real-time quota, with circuit breaker fallback.
 4. **Aggregate analytics**: Track usage across all providers in a unified dashboard.
@@ -60,6 +60,19 @@ pip install -r apps/control-plane/requirements.txt
 # Start proxy & desktop
 npm run tauri dev
 ```
+
+## Security Model
+
+Keys never leave your device. Encryption uses AES-256-GCM with a key derived from your machine's hardware fingerprint via PBKDF2-HMAC-SHA256 (310,000 iterations). The control plane only sees SHA-256 hashes for counting — never plaintext keys.
+
+## Free vs Ultra
+
+| Feature | Free | Ultra ($2/mo) |
+|---------|------|-----------------|
+| Keys | 2 | Unlimited |
+| Machines | 2 | Unlimited |
+| Rate limit | 30 req/min | Unlimited |
+| Routing | Basic | Smart + priority |
 
 ## License
 

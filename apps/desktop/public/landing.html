@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Key King — Zero-trust AI API Aggregator</title>
+  <meta name="description" content="Aggregate AI API quotas with zero-trust encryption. Drop-in OpenAI proxy with smart routing across 9 providers.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Inter', system-ui, sans-serif;
+      line-height: 1.6;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    header { padding: 60px 0; text-align: center; border-bottom: 1px solid #1f1f1f; }
+    h1 { font-size: 48px; margin-bottom: 16px; }
+    h1 span { color: #f59e0b; }
+    .subtitle { font-size: 20px; color: #999; max-width: 600px; margin: 0 auto; }
+    .cta { display: inline-block; margin-top: 32px; padding: 16px 32px; background: #f59e0b; color: #000; font-weight: bold; border-radius: 8px; text-decoration: none; }
+    .features { padding: 80px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+    .feature { padding: 32px; border: 1px solid #1f1f1f; border-radius: 12px; }
+    .feature h3 { color: #f59e0b; margin-bottom: 12px; }
+    .feature p { color: #999; }
+    .providers { padding: 60px 0; text-align: center; border-top: 1px solid #1f1f1f; }
+    .provider-logos { display: flex; justify-content: center; gap: 32px; margin-top: 32px; flex-wrap: wrap; }
+    .provider-logos span { padding: 12px 24px; border: 1px solid #1f1f1f; border-radius: 8px; color: #999; }
+    footer { padding: 40px 0; text-align: center; color: #666; border-top: 1px solid #1f1f1f; }
+    @media (max-width: 768px) {
+      .features { grid-template-columns: 1fr; }
+      h1 { font-size: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Key <span>King</span></h1>
+      <p class="subtitle">Zero-trust AI API aggregation with machine-fingerprint key vault, quota-aware routing, and drop-in OpenAI-compatible local proxy.</p>
+      <a href="https://github.com/Malaybhai11/keyking" class="cta">Download on GitHub</a>
+    </div>
+  </header>
+  
+  <section class="container features">
+    <div class="feature">
+      <h3>Zero-Trust Vault</h3>
+      <p>API keys encrypt with AES-256-GCM using a key derived from your machine's hardware fingerprint. Keys never leave your device.</p>
+    </div>
+    <div class="feature">
+      <h3>Sub-100ms Routing</h3>
+      <p>Smart provider selection based on real-time quota, with circuit breaker fallback. No server round-trip for routing decisions.</p>
+    </div>
+    <div class="feature">
+      <h3>Drop-in OpenAI Proxy</h3>
+      <p>Point any OpenAI-compatible client at localhost:8787. No code changes. Works with LangChain, Vercel AI SDK, and more.</p>
+    </div>
+  </section>
+  
+  <section class="providers">
+    <div class="container">
+      <h2>Supported Providers</h2>
+      <div class="provider-logos">
+        <span>OpenAI</span><span>Groq</span><span>Gemini</span><span>Mistral</span>
+        <span>Anthropic</span><span>xAI</span><span>DeepSeek</span><span>OpenRouter</span><span>Cohere</span>
+      </div>
+    </div>
+  </section>
+  
+  <footer>
+    <div class="container">
+      <p>Key King © 2025. Open source under MIT license.</p>
+    </div>
+  </footer>
+</body>
+</html>
