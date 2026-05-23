@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 import hashlib
 import time
 
@@ -16,11 +15,22 @@ class VerifyRequest(BaseModel):
     user_id: str
 
 MACHINES_DB = {}
+USERS_DB = {}
+
+def get_user_tier(user_id: str):
+    return USERS_DB.get(user_id, {}).get("tier", "free")
+
+def count_user_machines(user_id: str):
+    return sum(1 for m in MACHINES_DB.values() if m["user_id"] == user_id and not m.get("is_revoked", False))
 
 @router.post("/register")
 async def register_machine(req: RegisterRequest):
     if len(req.machine_hash) != 64 or not all(c in "0123456789abcdef" for c in req.machine_hash):
         raise HTTPException(status_code=400, detail="Invalid machine hash — must be 64 hex chars")
+    
+    tier = get_user_tier(req.user_id)
+    if tier == "free" and count_user_machines(req.user_id) >= 2:
+        raise HTTPException(status_code=403, detail={"error": "machine_limit_reached", "upgrade_url": "/billing/checkout"})
     
     key = f"{req.user_id}:{req.machine_hash}"
     if key in MACHINES_DB:
