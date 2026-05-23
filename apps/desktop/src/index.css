@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-white;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .keyking-card {
+    @apply bg-[#111111] border border-[#1f1f1f] rounded-lg p-4;
+  }
+  
+  .keyking-accent {
+    @apply text-[#f59e0b];
+  }
+}
