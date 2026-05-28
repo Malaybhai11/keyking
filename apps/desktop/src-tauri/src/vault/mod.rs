@@ -17,11 +17,12 @@ pub struct StoredKeyEntry {
 
 pub struct Vault {
     entries: Vec<StoredKeyEntry>,
-    data_dir: PathBuf,
+    pub data_dir: PathBuf,
 }
 
 impl Vault {
     pub fn new(data_dir: PathBuf) -> Self {
+        crypto::warmup();
         let vault_path = data_dir.join("vault.json");
         let entries = if vault_path.exists() {
             let data = fs::read_to_string(&vault_path).unwrap_or_default();
@@ -33,7 +34,7 @@ impl Vault {
         Self { entries, data_dir }
     }
     
-    pub fn add_key(&mut self, provider: &str, plaintext: &str) -> Result<StoredKeyEntry, super::crypto::VaultError> {
+    pub fn add_key(&mut self, provider: &str, plaintext: &str) -> Result<StoredKeyEntry, crypto::VaultError> {
         let encrypted = crypto::encrypt_key(plaintext)?;
         
         let masked = if plaintext.len() > 8 {
@@ -65,9 +66,25 @@ impl Vault {
         self.entries.clone()
     }
     
-    pub(crate) fn get_plaintext_key(&self, id: &str) -> Option<Result<String, super::crypto::VaultError>> {
+    pub(crate) fn get_plaintext_key(&self, id: &str) -> Option<Result<String, crypto::VaultError>> {
         let entry = self.entries.iter().find(|e| e.id == id)?;
         Some(crypto::decrypt_key(&entry.encrypted_key))
+    }
+
+    pub fn get_decrypted_key(&self, provider: &str) -> Option<Result<String, crypto::VaultError>> {
+        let entry = self.entries.iter().find(|e| e.provider == provider)?;
+        Some(crypto::decrypt_key(&entry.encrypted_key))
+    }
+
+    pub fn keys_by_provider(&self, provider: &str) -> Vec<StoredKeyEntry> {
+        self.entries.iter().filter(|e| e.provider == provider).cloned().collect()
+    }
+
+    pub fn set_key_validity(&mut self, id: &str, is_valid: bool) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            entry.is_valid = is_valid;
+            self.save();
+        }
     }
     
     fn save(&self) {

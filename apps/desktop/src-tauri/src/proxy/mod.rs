@@ -3,6 +3,16 @@ use serde::{Deserialize, Serialize};
 pub mod router;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingEvent {
+    pub id: String,
+    pub timestamp: u64,
+    pub provider: String,
+    pub latency_ms: u64,
+    pub tokens_used: u32,
+    pub success: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub role: String,
     pub content: String,

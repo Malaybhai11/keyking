@@ -1,9 +1,8 @@
-use axum::http::HeaderMap;
 use crate::proxy::{NormalizedRequest, NormalizedResponse};
-use crate::quota::QuotaState;
 
 pub mod openai;
 pub mod groq;
+pub mod anthropic;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AdapterError {
@@ -18,11 +17,9 @@ pub enum AdapterError {
 }
 
 pub trait ProviderAdapter {
-    async fn chat(&self, req: &NormalizedRequest, api_key: &str) -> Result<NormalizedResponse, AdapterError>;
-    fn parse_quota_headers(&self, headers: &HeaderMap) -> QuotaState;
-    fn provider_name(&self) -> String;
+    async fn chat(&self, client: &reqwest::Client, req: &NormalizedRequest, api_key: &str) -> Result<NormalizedResponse, AdapterError>;
 }
 
-// Re-export for convenience
 pub use openai::OpenAIAdapter;
 pub use groq::GroqAdapter;
+pub use anthropic::AnthropicAdapter;

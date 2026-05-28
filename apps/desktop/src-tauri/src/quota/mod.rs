@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use once_cell::sync::Lazy;
-use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CircuitState {
@@ -73,8 +71,15 @@ pub struct QuotaMap {
     quotas: RwLock<HashMap<String, QuotaState>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Provider {
+    OpenAI,
+    Groq,
+}
+
 #[derive(Debug, Clone)]
 pub struct QuotaState {
+    pub provider: Provider,
     pub remaining_requests: Option<u32>,
     pub remaining_tokens: Option<u32>,
     pub reset_at: Option<u64>,

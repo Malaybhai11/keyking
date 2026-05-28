@@ -1,6 +1,7 @@
 use aes_gcm::aead::{Aead, KeyInit, OsRng};
 use aes_gcm::aead::rand_core::RngCore;
 use aes_gcm::{Aes256Gcm, Key, Nonce};
+use base64::Engine;
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 use once_cell::sync::Lazy;
@@ -37,6 +38,10 @@ pub enum VaultError {
     IoError(String),
 }
 
+pub fn warmup() {
+    Lazy::force(&MACHINE_KEY);
+}
+
 pub fn encrypt_key(plaintext: &str) -> Result<String, VaultError> {
     let key = Key::<Aes256Gcm>::from_slice(&*MACHINE_KEY);
     let cipher = Aes256Gcm::new(key);
@@ -51,11 +56,11 @@ pub fn encrypt_key(plaintext: &str) -> Result<String, VaultError> {
     let mut result = nonce_bytes.to_vec();
     result.extend_from_slice(&ciphertext);
     
-    Ok(base64::encode(&result))
+    Ok(base64::engine::general_purpose::STANDARD.encode(&result))
 }
 
 pub fn decrypt_key(ciphertext_b64: &str) -> Result<String, VaultError> {
-    let ciphertext = base64::decode(ciphertext_b64)
+    let ciphertext = base64::engine::general_purpose::STANDARD.decode(ciphertext_b64)
         .map_err(|_| VaultError::EncryptionError)?;
     
     if ciphertext.len() < 12 {
