@@ -30,7 +30,7 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${lexend.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col font-body bg-neo-bg text-black">
+      <body className="min-h-full flex flex-col font-body bg-neo-bg text-black" suppressHydrationWarning>
         {children}
       </body>
     </html>

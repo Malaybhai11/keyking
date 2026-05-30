@@ -195,8 +195,8 @@ export OPENAI_API_KEY=${systemKey}`
       </div>
 
       {/* NAVBAR */}
-      <header className="max-w-7xl mx-auto px-4 md:px-8 py-5">
-        <nav className="flex items-center justify-between border-[3px] border-black bg-white rounded-none p-4 shadow-[4px_4px_0px_0px_#000] sticky top-4 z-50">
+      <header className="max-w-7xl mx-auto px-4 md:px-8 pt-3 pb-1">
+        <nav className="flex items-center justify-between border-[3px] border-black bg-white rounded-none py-2.5 px-4 shadow-[4px_4px_0px_0px_#000] sticky top-4 z-50">
           <div className="flex items-center gap-3">
             <div className="bg-[#fde047] text-black border-2 border-black p-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center">
               <img src="/finalKK.png" alt="KeyKing Logo" className="h-8 w-auto block select-none" />
@@ -234,61 +234,67 @@ export OPENAI_API_KEY=${systemKey}`
       </header>
 
       {/* HERO SECTION */}
-      <section className="max-w-7xl mx-auto px-4 md:px-8 pt-10 pb-16 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <section className="max-w-7xl mx-auto px-4 md:px-8 pt-3 pb-8 lg:py-6 lg:min-h-[calc(100vh-140px)] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
         
         {/* HERO LEFT COLUMN */}
-        <div className="lg:col-span-5 space-y-6 min-w-0">
-          <div className="inline-flex">
-            <NeoBadge variant="green" interactive className="text-[10px] tracking-widest font-mono">
-              <Star className="w-3.5 h-3.5 fill-current" /> Trusted by 10k+ Developers
-            </NeoBadge>
-          </div>
-
-          <h1 className="font-display font-black text-4xl sm:text-6xl tracking-tight leading-[0.95] uppercase">
-            Your API Keys. <br />
-            Locked to your <br />
-            <span className="relative inline-block z-10 px-2 py-1 my-1">
-              <span className="absolute inset-0 bg-[#fde047] border-[3px] border-black -skew-x-2 -rotate-1 -z-10 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></span>
-              Hardware.
-            </span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-neutral-800 font-medium leading-relaxed max-w-xl">
-            A zero-trust LLM API router. Credentials are encrypted locally using AES-256-GCM with keys derived from your hardware UUID. Redirect your upstream API traffic to localhost for intelligent rate-limit routing and cross-provider fallbacks.
-          </p>
-
-          <div className="max-w-xl bg-black text-[#00e676] border-[3px] border-black p-3.5 font-mono text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
-            <div className="truncate flex items-center gap-1.5">
-              <span className="text-[#ff2a85] font-bold">$</span> 
-              <span>curl -fsSL http://localhost:3000/install.sh | bash</span>
+          <div className="lg:col-span-5 space-y-4 min-w-0">
+            <div className="inline-flex">
+              <NeoBadge variant="green" interactive className="text-[10px] tracking-widest font-mono">
+                <Star className="w-3.5 h-3.5 fill-current" /> Trusted by 10k+ Developers
+              </NeoBadge>
             </div>
-            <button 
-              onClick={() => copyToClipboard("curl -fsSL http://localhost:3000/install.sh | bash", "install")}
-              className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded border border-neutral-700 transition shrink-0 cursor-pointer"
-              title="Copy installer command"
-            >
-              {copiedText === "install" ? <Check className="w-3.5 h-3.5 text-[#00e676]" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
-          </div>
 
-          <div className="flex flex-wrap gap-4 pt-2">
-            <NeoButton variant="green" size="lg" shadowColor="dark" className="flex items-center gap-2">
-              <span>Download Desktop Client</span>
-              <ArrowRight className="w-5 h-5" />
-            </NeoButton>
-            <a href="#playground">
-              <NeoButton variant="light" size="lg" shadowColor="dark" className="border-dashed">
-                Try cURL Playground
+            <h1 className="font-display font-black text-3xl sm:text-5xl lg:text-[54px] tracking-tight leading-[0.95] uppercase">
+              Your API Keys. <br />
+              Locked to your <br />
+              <span className="relative inline-block z-10 px-2 py-0.5 my-0.5">
+                <span className="absolute inset-0 bg-[#fde047] border-[3px] border-black -skew-x-2 -rotate-1 -z-10 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></span>
+                Hardware.
+              </span>
+            </h1>
+
+            <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed max-w-xl">
+              A zero-trust LLM API router. Credentials are encrypted locally using AES-256-GCM with keys derived from your hardware UUID. Redirect your upstream API traffic to localhost for intelligent rate-limit routing and cross-provider fallbacks.
+            </p>
+
+            <div className="max-w-xl bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
+              <div className="truncate flex items-center gap-1.5">
+                <span className="text-[#ff2a85] font-bold">$</span> 
+                <span>curl -fsSL http://localhost:3000/install.sh | bash</span>
+              </div>
+              <button 
+                onClick={() => copyToClipboard("curl -fsSL http://localhost:3000/install.sh | bash", "install")}
+                className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded border border-neutral-700 transition shrink-0 cursor-pointer"
+                title="Copy installer command"
+              >
+                {copiedText === "install" ? <Check className="w-3.5 h-3.5 text-[#00e676]" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-1">
+              <NeoButton variant="green" size="md" shadowColor="dark" className="flex items-center gap-2">
+                <span>Download Desktop Client</span>
+                <ArrowRight className="w-4 h-4" />
               </NeoButton>
-            </a>
-          </div>
+              <a href="https://github.com/Malaybhai11/keyking" target="_blank" rel="noopener noreferrer" className="inline-block">
+                <NeoButton variant="yellow" size="md" shadowColor="dark" className="flex items-center gap-2">
+                  <Star className="w-4 h-4 fill-current text-black animate-pulse" />
+                  <span>Star on GitHub</span>
+                </NeoButton>
+              </a>
+              <a href="#playground">
+                <NeoButton variant="light" size="md" shadowColor="dark" className="border-dashed">
+                  Try cURL Playground
+                </NeoButton>
+              </a>
+            </div>
 
-          <div className="flex flex-wrap gap-6 pt-4 font-display font-black text-xs uppercase tracking-wide text-neutral-600">
-            <span className="flex items-center gap-1.5"><Check className="w-4 h-4 shrink-0 text-black" /> No Cloud Storage</span>
-            <span className="flex items-center gap-1.5"><Check className="w-4 h-4 shrink-0 text-black" /> Local Axum Proxy</span>
-            <span className="flex items-center gap-1.5"><Check className="w-4 h-4 shrink-0 text-black" /> 9+ Model Providers</span>
+            <div className="flex flex-wrap gap-4 pt-1.5 font-display font-black text-[10px] uppercase tracking-wide text-neutral-600">
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 shrink-0 text-black" /> No Cloud Storage</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 shrink-0 text-black" /> Local Axum Proxy</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 shrink-0 text-black" /> 9+ Model Providers</span>
+            </div>
           </div>
-        </div>
 
         {/* HERO RIGHT COLUMN: HIGH FIDELITY DESKTOP APP MOCKUP */}
         <div className="lg:col-span-7 px-4 sm:px-8 py-8 min-w-0">
