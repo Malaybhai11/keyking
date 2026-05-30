@@ -35,6 +35,9 @@ export default function Home() {
   // Navigation & Interactive Tabs
   const [activeTab, setActiveTab] = useState<"curl" | "python" | "node" | "env">("curl");
   
+  // Coming Soon Popup Modal State
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  
   // Playground Simulator State
   const [simState, setSimState] = useState<"idle" | "decrypting" | "routing" | "success" | "streaming">("idle");
   const [simOutput, setSimOutput] = useState<string>("");
@@ -215,7 +218,7 @@ export OPENAI_API_KEY=${systemKey}`
 
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => alert("Coming Soon Buds! Stay Tuned")}
+              onClick={() => setShowComingSoon(true)}
               className="text-xs font-display font-bold uppercase hover:underline hidden sm:inline pr-2 cursor-pointer bg-transparent border-none text-black"
             >
               Sign In
@@ -854,7 +857,58 @@ export OPENAI_API_KEY=${systemKey}`
         </div>
       </footer>
 
+      {/* COMING SOON POPUP MODAL */}
+      {showComingSoon && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <NeoCard 
+            variant="yellow" 
+            shadowSize="lg" 
+            titleBar={
+              <div className="flex items-center justify-between w-full">
+                <span className="font-display font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  👑 BILLING & CHECKOUT
+                </span>
+              </div>
+            }
+            className="max-w-md w-full"
+          >
+            <div className="p-6 space-y-4">
+              <p className="font-display font-black text-xl uppercase leading-tight text-black">
+                Coming Soon Guys! <br />
+                Please stay tuned.
+              </p>
+              <p className="text-xs sm:text-sm font-medium text-neutral-800 leading-relaxed">
+                We are building the most secure hardware-derived SaaS subscription layer. Feel free to reach out for updates, requests, or early access suggestions!
+              </p>
+              
+              {/* Contact Box */}
+              <div className="bg-white border-2 border-black p-3.5 font-mono text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] select-all flex items-center justify-between gap-3 text-black">
+                <div className="truncate flex items-center gap-1.5">
+                  <span className="text-neutral-500">Mail:</span> 
+                  <span className="font-bold select-all">malay@ledgion.in</span>
+                </div>
+                <button 
+                  onClick={() => copyToClipboard("malay@ledgion.in", "email")}
+                  className="p-1 hover:bg-neutral-100 text-neutral-600 hover:text-black rounded border border-neutral-350 transition shrink-0 cursor-pointer bg-white"
+                  title="Copy email address"
+                >
+                  {copiedText === "email" ? <Check className="w-3.5 h-3.5 text-[#00e676]" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
 
+              <div className="pt-2 flex justify-end">
+                <NeoButton 
+                  variant="dark" 
+                  size="sm" 
+                  onClick={() => setShowComingSoon(false)}
+                >
+                  Got it, Thanks!
+                </NeoButton>
+              </div>
+            </div>
+          </NeoCard>
+        </div>
+      )}
 
     </div>
   );
