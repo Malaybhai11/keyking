@@ -67,44 +67,67 @@ EOT
 fi
 
 # 4. Construct Download Link
-# Assuming binaries are compiled and uploaded as tarballs/zips to Github Releases
+# Archives are uploaded by GitHub Actions in a known format
 if [ "$OS" = "darwin" ]; then
-    BINARY_FILE="keyking_darwin_${ARCH}.tar.gz"
+    BINARY_FILE="keyking_darwin_universal.tar.gz"
 elif [ "$OS" = "linux" ]; then
     BINARY_FILE="keyking_linux_${ARCH}.tar.gz"
 elif [ "$OS" = "windows" ]; then
     BINARY_FILE="keyking_windows_${ARCH}.zip"
 else
-    # Fallback to standard linux distribution
     BINARY_FILE="keyking_linux_amd64.tar.gz"
 fi
 
 URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/${BINARY_FILE}"
 
+# Also check the latest release tag to auto-detect version
+LATEST_URL="https://github.com/${GITHUB_REPO}/releases/latest/download/${BINARY_FILE}"
+
 # 5. Execute Binary Download & Extraction
 echo -e "Downloading binary bundle from ${YELLOW}${URL}${NC}..."
 
-# We fail silently or fallback to local search if not uploaded yet (for development environments)
+DOWNLOAD_SUCCESS=false
+
+# Try exact version first
 if curl -fsSLI "$URL" >/dev/null 2>&1; then
+    echo -e "${GREEN}Found release v${VERSION} on GitHub.${NC}"
     if [ "$OS" = "windows" ]; then
         curl -fsSL -o "$TMP_DIR/bundle.zip" "$URL"
         unzip -q "$TMP_DIR/bundle.zip" -d "$TMP_DIR"
     else
         curl -fsSL "$URL" | tar -xz -C "$TMP_DIR"
     fi
-else
-    echo -e "${YELLOW}Warning: Remote release binary v${VERSION} not found on GitHub yet.${NC}"
+    DOWNLOAD_SUCCESS=true
+# Try latest release
+elif curl -fsSLI "$LATEST_URL" >/dev/null 2>&1; then
+    echo -e "${GREEN}Found latest release on GitHub.${NC}"
+    if [ "$OS" = "windows" ]; then
+        curl -fsSL -o "$TMP_DIR/bundle.zip" "$LATEST_URL"
+        unzip -q "$TMP_DIR/bundle.zip" -d "$TMP_DIR"
+    else
+        curl -fsSL "$LATEST_URL" | tar -xz -C "$TMP_DIR"
+    fi
+    DOWNLOAD_SUCCESS=true
+fi
+
+if [ "$DOWNLOAD_SUCCESS" = false ]; then
+    echo -e "${YELLOW}Warning: Release binaries not found on GitHub.${NC}"
     echo -e "Searching for a locally compiled binary in active workspace..."
     
     # Attempt to locate locally built release files in cargo target
     LOCAL_BIN=""
-    if [ -f "./apps/desktop/src-tauri/target/release/keyking-desktop" ]; then
-        LOCAL_BIN="./apps/desktop/src-tauri/target/release/keyking-desktop"
-    elif [ -f "../apps/desktop/src-tauri/target/release/keyking-desktop" ]; then
-        LOCAL_BIN="../apps/desktop/src-tauri/target/release/keyking-desktop"
-    elif [ -f "../../apps/desktop/src-tauri/target/release/keyking-desktop" ]; then
-        LOCAL_BIN="../../apps/desktop/src-tauri/target/release/keyking-desktop"
-    fi
+    SEARCH_DIRS=(
+        "./apps/desktop/src-tauri/target/release"
+        "../apps/desktop/src-tauri/target/release"
+        "../../apps/desktop/src-tauri/target/release"
+    )
+    
+    for dir in "${SEARCH_DIRS[@]}"; do
+        if [ -f "$dir/keyking-desktop" ]; then
+            LOCAL_BIN="$dir/keyking-desktop"
+            break
+        fi
+    done
     
     if [ -n "$LOCAL_BIN" ]; then
         echo -e "Found local binary at: ${GREEN}${LOCAL_BIN}${NC}"
@@ -112,6 +135,8 @@ else
     else
         echo -e "${RED}Error: Release binaries could not be downloaded or located locally.${NC}"
         echo -e "Please compile first using: ${YELLOW}cargo build --release${NC} inside apps/desktop/src-tauri"
+        echo -e "Or wait for a GitHub Release to be published at:"
+        echo -e "  ${YELLOW}https://github.com/${GITHUB_REPO}/releases${NC}"
         rm -rf "$TMP_DIR"
         exit 1
     fi
@@ -140,17 +165,8 @@ else
             mv "$TMP_DIR/$APP_NAME" "$USER_BIN/$APP_NAME"
             INSTALL_DIR="$USER_BIN"
         else
-            # Fallback to local workspace bin directory
-            WORKSPACE_BIN="./bin"
-            mkdir -p "$WORKSPACE_BIN"
-            if [ -w "$WORKSPACE_BIN" ]; then
-                echo -e "Installing binary to workspace bin ${WORKSPACE_BIN}..."
-                mv "$TMP_DIR/$APP_NAME" "$WORKSPACE_BIN/$APP_NAME"
-                INSTALL_DIR="$(pwd)/bin"
-            else
-                echo -e "${YELLOW}Administrator privilege (sudo) is required to write to ${INSTALL_DIR}...${NC}"
-                sudo mv "$TMP_DIR/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
-            fi
+            echo -e "${YELLOW}Administrator privilege (sudo) is required to write to ${INSTALL_DIR}...${NC}"
+            sudo mv "$TMP_DIR/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
         fi
     fi
     
@@ -161,7 +177,7 @@ fi
 # 7. Clean up temporary directory
 rm -rf "$TMP_DIR"
 
-# 8. Post-install Verification & Injection into Shell Profiles
+# 8. Post-install Verification
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}👑 Installation Completed Successfully!${NC}"
 echo -e "  - Configuration: ${CONFIG_DIR}/config.json"

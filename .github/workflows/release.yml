@@ -10,19 +10,25 @@ permissions:
   contents: write # Required to create releases and upload assets
 
 jobs:
-  publish-tauri:
+  build-tauri:
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # Builds macOS amd64 & arm64
+          - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-22.04' # Builds Linux deb / AppImage
+            os_name: 'darwin'
+            arch: 'universal'
+          - platform: 'ubuntu-22.04'
             args: ''
-          - platform: 'windows-latest' # Builds Windows msi / exe
+            os_name: 'linux'
+            arch: 'amd64'
+          - platform: 'windows-latest'
             args: ''
+            os_name: 'windows'
+            arch: 'amd64'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -32,12 +38,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Build target for macOS universal binary if compiling on macOS
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install Linux system dependencies (Ubuntu only)
@@ -56,30 +61,94 @@ jobs:
             librsvg2-dev
 
       - name: Install Desktop App Dependencies
-        run: |
-          cd apps/desktop
-          npm install
+        working-directory: apps/desktop
+        run: npm install
 
       - name: Build Tauri Desktop Client
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: keyking-v__VERSION__ # Will be replaced by tauri-action using tag
-          releaseName: "KeyKing Desktop v__VERSION__"
-          releaseBody: "Automated production release for KeyKing desktop client aggregator."
-          releaseDraft: true
+          projectPath: 'apps/desktop'
+          tauriScript: 'npm run tauri'
+          tagName: v__VERSION__
+          releaseName: "KeyKing v__VERSION__"
+          releaseBody: |
+            ## KeyKing Desktop v__VERSION__
+
+            ### Installation
+
+            **One-line install (Linux/macOS):**
+            ```bash
+            curl -fsSL https://keyking.dev/install.sh | bash
+            ```
+
+            **Or download the installer for your platform below.**
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-          projectPath: './apps/desktop'
 
-  # Optional job to package zip/tar archives and upload them to match installer naming structure
-  package-archives:
-    needs: publish-tauri
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download release assets helper
-        uses: actions/github-script@v7
+      # After tauri-action, also upload a simple tar.gz/zip that matches install.sh naming
+      - name: Package portable archive (Linux)
+        if: matrix.os_name == 'linux'
+        run: |
+          VERSION=$(grep '"version"' apps/desktop/src-tauri/tauri.conf.json | head -1 | sed 's/.*: *"\(.*\)".*/\1/')
+          BINARY_PATH=$(find apps/desktop/src-tauri/target/release/bundle -name "*.AppImage" -o -name "key-king" -o -name "keyking-desktop" 2>/dev/null | head -1)
+          
+          # If no bundle binary, use the raw release binary
+          if [ -z "$BINARY_PATH" ]; then
+            BINARY_PATH="apps/desktop/src-tauri/target/release/keyking-desktop"
+          fi
+          
+          if [ -f "$BINARY_PATH" ]; then
+            mkdir -p /tmp/keyking-package
+            cp "$BINARY_PATH" /tmp/keyking-package/keyking
+            chmod +x /tmp/keyking-package/keyking
+            cd /tmp/keyking-package
+            tar -czf /tmp/keyking_linux_amd64.tar.gz keyking
+            echo "ARCHIVE_PATH=/tmp/keyking_linux_amd64.tar.gz" >> $GITHUB_ENV
+            echo "ARCHIVE_NAME=keyking_linux_amd64.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Package portable archive (macOS)
+        if: matrix.os_name == 'darwin'
+        run: |
+          VERSION=$(grep '"version"' apps/desktop/src-tauri/tauri.conf.json | head -1 | sed 's/.*: *"\(.*\)".*/\1/')
+          BINARY_PATH=$(find apps/desktop/src-tauri/target -name "Key King" -o -name "keyking-desktop" 2>/dev/null | grep -v deps | head -1)
+          
+          if [ -z "$BINARY_PATH" ]; then
+            BINARY_PATH="apps/desktop/src-tauri/target/universal-apple-darwin/release/keyking-desktop"
+          fi
+          
+          if [ -f "$BINARY_PATH" ]; then
+            mkdir -p /tmp/keyking-package
+            cp "$BINARY_PATH" /tmp/keyking-package/keyking
+            chmod +x /tmp/keyking-package/keyking
+            cd /tmp/keyking-package
+            tar -czf /tmp/keyking_darwin_universal.tar.gz keyking
+            echo "ARCHIVE_PATH=/tmp/keyking_darwin_universal.tar.gz" >> $GITHUB_ENV
+            echo "ARCHIVE_NAME=keyking_darwin_universal.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Package portable archive (Windows)
+        if: matrix.os_name == 'windows'
+        shell: pwsh
+        run: |
+          $binary = Get-ChildItem -Path "apps/desktop/src-tauri/target/release" -Filter "keyking-desktop.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          
+          if ($binary) {
+            New-Item -ItemType Directory -Force -Path "$env:TEMP/keyking-package" | Out-Null
+            Copy-Item $binary.FullName "$env:TEMP/keyking-package/keyking.exe"
+            Compress-Archive -Path "$env:TEMP/keyking-package/keyking.exe" -DestinationPath "$env:TEMP/keyking_windows_amd64.zip"
+            echo "ARCHIVE_PATH=$env:TEMP/keyking_windows_amd64.zip" >> $env:GITHUB_ENV
+            echo "ARCHIVE_NAME=keyking_windows_amd64.zip" >> $env:GITHUB_ENV
+          }
+
+      - name: Upload portable archive to release
+        if: env.ARCHIVE_PATH != ''
+        uses: softprops/action-gh-release@v2
         with:
-          script: |
-            console.log("Draft release has been created. You can rename/upload ZIP/tar.gz files matching the installer format.");
+          files: ${{ env.ARCHIVE_PATH }}
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
