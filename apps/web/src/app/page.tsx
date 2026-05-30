@@ -214,21 +214,17 @@ export OPENAI_API_KEY=${systemKey}`
           </div>
 
           <div className="flex items-center gap-3">
-            <a href="http://localhost:8000/billing/checkout" target="_blank" rel="noopener noreferrer">
-              <span className="text-xs font-display font-bold uppercase hover:underline hidden sm:inline pr-2">
-                Sign In
-              </span>
-            </a>
-            <NeoButton 
-              variant="pink" 
-              size="sm" 
-              onClick={() => {
-                alert("Initiating download for the latest client bundle (macOS, Linux, and Windows).");
-                console.log("Initiating download sequence for client release: v4.0.0-release.zip");
-              }}
+            <button 
+              onClick={() => alert("Coming Soon Buds! Stay Tuned")}
+              className="text-xs font-display font-bold uppercase hover:underline hidden sm:inline pr-2 cursor-pointer bg-transparent border-none text-black"
             >
-              Get Client
-            </NeoButton>
+              Sign In
+            </button>
+            <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer">
+              <NeoButton variant="pink" size="sm">
+                Get Client
+              </NeoButton>
+            </a>
           </div>
         </nav>
       </header>
@@ -240,7 +236,7 @@ export OPENAI_API_KEY=${systemKey}`
           <div className="lg:col-span-5 space-y-4 min-w-0">
             <div className="inline-flex">
               <NeoBadge variant="green" interactive className="text-[10px] tracking-widest font-mono">
-                <Star className="w-3.5 h-3.5 fill-current" /> Trusted by 10k+ Developers
+                <Star className="w-3.5 h-3.5 fill-current" /> Will be trusted by 10k developers Soon,
               </NeoBadge>
             </div>
 
@@ -272,10 +268,12 @@ export OPENAI_API_KEY=${systemKey}`
             </div>
 
             <div className="flex flex-wrap gap-3 pt-1">
-              <NeoButton variant="green" size="md" shadowColor="dark" className="flex items-center gap-2">
-                <span>Download Desktop Client</span>
-                <ArrowRight className="w-4 h-4" />
-              </NeoButton>
+              <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer" className="inline-block">
+                <NeoButton variant="green" size="md" shadowColor="dark" className="flex items-center gap-2">
+                  <span>Download Desktop Client</span>
+                  <ArrowRight className="w-4 h-4" />
+                </NeoButton>
+              </a>
               <a href="https://github.com/Malaybhai11/keyking" target="_blank" rel="noopener noreferrer" className="inline-block">
                 <NeoButton variant="yellow" size="md" shadowColor="dark" className="flex items-center gap-2">
                   <Star className="w-4 h-4 fill-current text-black animate-pulse" />

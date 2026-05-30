@@ -28,6 +28,10 @@
   }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   --background: #fcf6e6;
   --foreground: #000000;
