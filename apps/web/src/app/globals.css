@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neo-bg: #fcf6e6;
+  --color-neo-yellow: #fde047;
+  --color-neo-green: #00e676;
+  --color-neo-pink: #ff2a85;
+  --color-neo-cyan: #00f0ff;
+  --color-neo-purple: #9d4edd;
+  --color-neo-orange: #ff6d00;
+  --color-neo-dark: #000000;
+  --color-neo-light: #ffffff;
+  --color-neo-gray: #e5e7eb;
+  
+  --font-display: var(--font-space-grotesk), var(--font-sans);
+  --font-body: var(--font-lexend), var(--font-sans);
+  
+  --shadow-neo-sm: 2px 2px 0px 0px #000000;
+  --shadow-neo-md: 4px 4px 0px 0px #000000;
+  --shadow-neo-lg: 8px 8px 0px 0px #000000;
+  --shadow-neo-xl: 12px 12px 0px 0px #000000;
+
+  --animate-marquee: marquee 30s linear infinite;
+
+  @keyframes marquee {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-50%, 0, 0); }
+  }
+}
+
+:root {
+  --background: #fcf6e6;
+  --foreground: #000000;
+  --font-sans: var(--font-space-grotesk);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0d0d0d;
+    --foreground: #ffffff;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-lexend), system-ui, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom premium scrollbar in Neo-Brutalist style */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #fcf6e6;
+  border-left: 3px solid #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #fde047;
+  border: 3px solid #000000;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #ff2a85;
+}
+
+/* Hard borders selection */
+::selection {
+  background-color: #00f0ff;
+  color: #000000;
+}
