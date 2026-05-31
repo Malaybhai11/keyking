@@ -170,7 +170,7 @@ console.log(response.choices[0].message.content);`,
     env: `# Set environment variables to override standard SDK routing
 export OPENAI_BASE_URL=http://localhost:8787/v1
 export OPENAI_API_KEY=${systemKey}`,
-    sdk: `import { KeyKing } from "@keyking/sdk";
+    sdk: `import { KeyKing } from "keyking-sdk";
 
 // Initialize KeyKing SDK with your exported vault
 const kk = new KeyKing({ vaultPath: "./vault.kk" });
@@ -266,18 +266,34 @@ console.log(response.choices[0].message.content);`
               A comprehensive toolchain for secure LLM API access. Use the Desktop Proxy for local vibe-coding, deploy the NPM SDK to production, and manage everything securely in the Desktop Vault.
             </p>
 
-            <div className="max-w-xl bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
-              <div className="truncate flex items-center gap-1.5">
-                <span className="text-[#ff2a85] font-bold">$</span> 
-                <span>curl -fsSL http://localhost:3000/install.sh | bash</span>
+            <div className="flex flex-col gap-2 max-w-xl">
+              <div className="bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
+                <div className="truncate flex items-center gap-1.5">
+                  <span className="text-[#ff2a85] font-bold">Install Desktop Proxy:</span> 
+                  <span>curl -fsSL https://keyking.vercel.app/install.sh | bash</span>
+                </div>
+                <button 
+                  onClick={() => copyToClipboard("curl -fsSL https://keyking.vercel.app/install.sh | bash", "install")}
+                  className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded border border-neutral-700 transition shrink-0 cursor-pointer"
+                  title="Copy installer command"
+                >
+                  {copiedText === "install" ? <Check className="w-3.5 h-3.5 text-[#00e676]" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
               </div>
-              <button 
-                onClick={() => copyToClipboard("curl -fsSL http://localhost:3000/install.sh | bash", "install")}
-                className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded border border-neutral-700 transition shrink-0 cursor-pointer"
-                title="Copy installer command"
-              >
-                {copiedText === "install" ? <Check className="w-3.5 h-3.5 text-[#00e676]" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+
+              <div className="bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
+                <div className="truncate flex items-center gap-1.5">
+                  <span className="text-[#ff2a85] font-bold">Install Serverless SDK:</span> 
+                  <span>npm install keyking-sdk</span>
+                </div>
+                <button 
+                  onClick={() => copyToClipboard("npm install keyking-sdk", "install-sdk")}
+                  className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded border border-neutral-700 transition shrink-0 cursor-pointer"
+                  title="Copy SDK install command"
+                >
+                  {copiedText === "install-sdk" ? <Check className="w-3.5 h-3.5 text-[#00e676]" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3 pt-1">
