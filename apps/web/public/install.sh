@@ -9,7 +9,7 @@ set -e
 
 # ─────────────────────────── Configuration ────────────────────────────
 APP_NAME="keyking"
-VERSION="1.1.0"
+VERSION="1.2.0"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/keyking"
 GITHUB_REPO="Malaybhai11/keyking"
@@ -237,12 +237,10 @@ simulate_progress() {
   local label="$1"
   local duration="${2:-2}"
   local steps=30
-  local sleep_time
-  sleep_time=$(echo "scale=3; $duration / $steps" | bc 2>/dev/null || echo "0.06")
 
   for ((i = 1; i <= steps; i++)); do
     progress_bar "$i" "$steps" "$label"
-    sleep "$sleep_time"
+    sleep 0.05 2>/dev/null || sleep 1
   done
   echo ""
 }

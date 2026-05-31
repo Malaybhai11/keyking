@@ -4,10 +4,10 @@
 
 @layer base {
   body {
-    @apply bg-black text-gray-100;
+    @apply bg-[#050505] text-gray-200;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    background-image: radial-gradient(circle at 50% 0%, #16161a 0%, #000000 80%);
+    background-image: radial-gradient(circle at 50% 0%, #0f0f12 0%, #050505 100%);
     background-attachment: fixed;
   }
   
@@ -17,14 +17,14 @@
 
   /* Custom Scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full border-2 border-black;
+    @apply bg-white/10 rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-white/20;
@@ -33,18 +33,18 @@
 
 @layer components {
   .keyking-card {
-    @apply bg-[#0c0c0e]/80 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 shadow-xl transition-all duration-300;
+    @apply bg-[#0a0a0a]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-6 transition-all duration-300;
   }
   
   .keyking-card:hover {
-    @apply border-white/10 shadow-2xl;
+    @apply border-white/10 bg-[#0a0a0a]/80;
   }
   
   .keyking-accent {
-    @apply text-amber-500;
+    @apply text-gray-200;
   }
   
   .glass-panel {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl;
+    @apply bg-[#0a0a0a]/40 backdrop-blur-md border border-white/5 rounded-xl;
   }
 }

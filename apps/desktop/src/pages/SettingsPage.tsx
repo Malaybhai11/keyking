@@ -12,8 +12,8 @@ export default function SettingsPage() {
       <div className="keyking-card">
         <h3 className="text-lg font-semibold mb-4">Account</h3>
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${tier === 'ultra' ? 'bg-amber-900/50' : 'bg-gray-800'}`}>
-            {tier === 'ultra' ? <Crown className="w-5 h-5 text-[#f59e0b]" /> : <Zap className="w-5 h-5 text-gray-400" />}
+          <div className={`p-2 rounded-lg ${tier === 'ultra' ? 'bg-white/10' : 'bg-white/5'}`}>
+            {tier === 'ultra' ? <Crown className="w-5 h-5 text-white" /> : <Zap className="w-5 h-5 text-gray-400" />}
           </div>
           <div>
             <div className="font-bold">{tier === 'ultra' ? 'Ultra' : 'Free'} Tier</div>
@@ -21,7 +21,7 @@ export default function SettingsPage() {
           </div>
         </div>
         {tier === 'free' && (
-          <button className="mt-4 w-full py-2 bg-[#f59e0b] text-black rounded-lg font-bold hover:bg-[#d97706] transition">
+          <button className="mt-4 w-full py-2 bg-white text-black rounded-lg font-bold hover:bg-gray-200 transition shadow-sm">
             Upgrade to Ultra — $2/month
           </button>
         )}
@@ -35,7 +35,7 @@ export default function SettingsPage() {
             type="number"
             value={port}
             onChange={(e) => setPort(Number(e.target.value))}
-            className="w-24 bg-[#1f1f1f] border border-gray-700 rounded-lg px-3 py-2"
+            className="w-24 bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30"
           />
         </div>
       </div>

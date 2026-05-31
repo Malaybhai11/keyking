@@ -244,16 +244,16 @@ export OPENAI_API_KEY=${systemKey}`
             </div>
 
             <h1 className="font-display font-black text-3xl sm:text-5xl lg:text-[54px] tracking-tight leading-[0.95] uppercase">
-              Never Hit <br />
-              LLM Rate Limits <br />
+              The KeyKing <br />
+              Developer <br />
               <span className="relative inline-block z-10 px-2 py-0.5 my-0.5">
                 <span className="absolute inset-0 bg-[#fde047] border-[3px] border-black -skew-x-2 -rotate-1 -z-10 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></span>
-                Again.
+                Ecosystem
               </span>
             </h1>
 
             <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed max-w-xl">
-              A zero-trust LLM API router. Credentials are encrypted locally using AES-256-GCM with keys derived from your hardware UUID. Redirect your upstream API traffic to localhost for intelligent rate-limit routing and cross-provider fallbacks.
+              A comprehensive toolchain for secure LLM API access. Use the Desktop Proxy for local vibe-coding, deploy the NPM SDK to production, and manage everything securely in the Desktop Vault.
             </p>
 
             <div className="max-w-xl bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
@@ -448,64 +448,51 @@ export OPENAI_API_KEY=${systemKey}`
         
         <div className="text-center max-w-2xl mx-auto space-y-4 mb-16">
           <h2 className="font-display font-black text-3xl sm:text-5xl uppercase tracking-tight">
-            Built for developers who value security & uptime
+            One Ecosystem, Three Powerful Workflows
           </h2>
           <p className="text-sm text-neutral-700 font-medium">
-            Key King gives you the flexibility of multi-provider LLMs combined with local host security. No logins required, no databases to compromise.
+            Whether you are vibe-coding locally or scaling a serverless production app, KeyKing provides the ultimate infrastructure for LLM API security.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          <NeoCard titleBar="CRYPTOGRAPHIC SHIELD" variant="yellow" hoverExpand shadowSize="md">
-            <div className="space-y-3 flex-1 flex flex-col justify-between">
-              <div className="space-y-2">
-                <Lock className="w-8 h-8 text-[#ff2a85]" />
-                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Zero-Trust Vault</h3>
-                <p className="text-xs text-black/80 leading-relaxed font-medium">
-                  We derive a 256-bit key from your machine's unique hardware UUID using PBKDF2-HMAC-SHA256 (310,000 iterations). Your credentials are stored locally as encrypted ciphertexts — remaining secure even if configuration files are compromised.
-                </p>
-              </div>
-              <NeoBadge variant="dark" className="self-start mt-2">AES-256-GCM</NeoBadge>
-            </div>
-          </NeoCard>
-
-          <NeoCard titleBar="DROP-IN INTERACTION" variant="green" hoverExpand shadowSize="md">
+          <NeoCard titleBar="LOCAL DEVELOPMENT" variant="green" hoverExpand shadowSize="md">
             <div className="space-y-3 flex-1 flex flex-col justify-between">
               <div className="space-y-2">
                 <Terminal className="w-8 h-8 text-black" />
-                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Axum Local Proxy</h3>
+                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Desktop Proxy</h3>
                 <p className="text-xs text-black/80 leading-relaxed font-medium">
-                  Runs an asynchronous Rust web server binding to port 8787. Implements OpenAI-compatible endpoints. Adjusting your SDK's base URL redirects all requests through the local proxy automatically.
+                  Ideal for "Vibe-coding". Run the KeyKing local proxy that binds to <code>localhost:8787</code>. Route your local AI assistants and scripts through the proxy to automatically securely attach credentials and balance limits without exposing your plaintext API keys in dotfiles.
                 </p>
               </div>
-              <NeoBadge variant="dark" className="self-start mt-2">OpenAI SDK Ready</NeoBadge>
+              <NeoBadge variant="dark" className="self-start mt-2">Localhost:8787</NeoBadge>
             </div>
           </NeoCard>
 
-          <NeoCard titleBar="INTELLIGENT TELEMETRY" variant="cyan" hoverExpand shadowSize="md">
+          <NeoCard titleBar="PRODUCTION DEPLOYMENT" variant="cyan" hoverExpand shadowSize="md">
             <div className="space-y-3 flex-1 flex flex-col justify-between">
               <div className="space-y-2">
-                <RotateCw className="w-8 h-8 text-black" />
-                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Quota-Aware Fallback</h3>
+                <Cpu className="w-8 h-8 text-black" />
+                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Serverless SDK</h3>
                 <p className="text-xs text-black/80 leading-relaxed font-medium">
-                  Automatically extracts rate-limit quotas from response headers to maintain in-memory routing tables. Prioritizes keys based on remaining token capacity, ensuring dynamic fallbacks across 9+ providers.
+                  Deploy to production with zero friction using <code>@keyking/sdk</code>. Purpose-built for serverless environments (Vercel, AWS Lambda, Cloudflare Workers). It natively unpacks exported encrypted vaults in memory, providing secure multi-provider routing on the edge.
                 </p>
               </div>
-              <NeoBadge variant="dark" className="self-start mt-2">Smart Router</NeoBadge>
+              <NeoBadge variant="dark" className="self-start mt-2">NPM SDK</NeoBadge>
             </div>
           </NeoCard>
 
-          <NeoCard titleBar="TELEMETRY CONTROL" variant="pink" hoverExpand shadowSize="md">
+          <NeoCard titleBar="KEY MANAGEMENT" variant="yellow" hoverExpand shadowSize="md">
             <div className="space-y-3 flex-1 flex flex-col justify-between">
               <div className="space-y-2">
-                <ShieldAlert className="w-8 h-8 text-white" />
-                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight text-white">Anomaly Detection</h3>
-                <p className="text-xs text-white/90 leading-relaxed font-medium">
-                  Synchronized with the secure control plane. Monitors request velocity, concurrent geolocation anomalies, and machine authorization states to trigger circuit breakers automatically.
+                <Lock className="w-8 h-8 text-[#ff2a85]" />
+                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Desktop App Vault</h3>
+                <p className="text-xs text-black/80 leading-relaxed font-medium">
+                  Your mission control for credentials. Securely store and manage all your LLM API keys locally. Generate encrypted vault files that you can safely commit to your repository or bundle in your serverless deployments to be unpacked by the KeyKing SDK.
                 </p>
               </div>
-              <NeoBadge variant="light" className="self-start mt-2 text-black">FastAPI Integration</NeoBadge>
+              <NeoBadge variant="dark" className="self-start mt-2">Zero-Trust AES-256</NeoBadge>
             </div>
           </NeoCard>
 
