@@ -4,21 +4,47 @@
 
 @layer base {
   body {
-    @apply bg-[#0a0a0a] text-white;
+    @apply bg-black text-gray-100;
     font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(circle at 50% 0%, #16161a 0%, #000000 80%);
+    background-attachment: fixed;
   }
   
   code, pre {
     font-family: 'JetBrains Mono', monospace;
   }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full border-2 border-black;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
+  }
 }
 
 @layer components {
   .keyking-card {
-    @apply bg-[#111111] border border-[#1f1f1f] rounded-lg p-4;
+    @apply bg-[#0c0c0e]/80 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 shadow-xl transition-all duration-300;
+  }
+  
+  .keyking-card:hover {
+    @apply border-white/10 shadow-2xl;
   }
   
   .keyking-accent {
-    @apply text-[#f59e0b];
+    @apply text-amber-500;
+  }
+  
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl;
   }
 }
