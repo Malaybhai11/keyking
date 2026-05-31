@@ -220,10 +220,11 @@ console.log(response.choices[0].message.content);`
           </div>
 
           <div className="hidden md:flex items-center gap-8 font-display font-bold uppercase text-xs tracking-wider">
-            <a href="#features" className="hover:text-[#ff2a85] transition-colors">Features</a>
-            <a href="#playground" className="hover:text-[#ff2a85] transition-colors">cURL Playground</a>
-            <a href="#pricing" className="hover:text-[#ff2a85] transition-colors">Pricing</a>
-            <a href="#faq" className="hover:text-[#ff2a85] transition-colors">Developer FAQ</a>
+            <a href="/docs" className="hover:text-[#ff2a85] transition-colors text-[#ff2a85]">Docs</a>
+            <a href="/#features" className="hover:text-[#ff2a85] transition-colors">Features</a>
+            <a href="/#playground" className="hover:text-[#ff2a85] transition-colors">cURL Playground</a>
+            <a href="/#pricing" className="hover:text-[#ff2a85] transition-colors">Pricing</a>
+            <a href="/#faq" className="hover:text-[#ff2a85] transition-colors">Developer FAQ</a>
           </div>
 
           <div className="flex items-center gap-3">
