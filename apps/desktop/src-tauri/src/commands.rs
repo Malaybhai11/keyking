@@ -129,3 +129,65 @@ pub async fn clear_routing_events(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn export_vault(
+    state: tauri::State<'_, SharedVault>,
+    passphrase: String,
+) -> Result<String, String> {
+    use aes_gcm::aead::{Aead, KeyInit, OsRng};
+    use aes_gcm::aead::rand_core::RngCore;
+    use aes_gcm::{Aes256Gcm, Key, Nonce};
+    use base64::Engine;
+    use pbkdf2::pbkdf2_hmac;
+    use sha2::Sha256;
+
+    let vault = state.vault.lock().await;
+    let entries = vault.list_keys();
+
+    // Build the JSON array of {provider, key} objects
+    let mut key_objects: Vec<serde_json::Value> = Vec::new();
+    for entry in &entries {
+        let plaintext = vault
+            .get_plaintext_key(&entry.id)
+            .ok_or_else(|| format!("Key {} not found", entry.id))?
+            .map_err(|e| e.to_string())?;
+        key_objects.push(serde_json::json!({
+            "provider": entry.provider,
+            "key": plaintext
+        }));
+    }
+    drop(vault);
+
+    let json_payload = serde_json::to_string(&key_objects)
+        .map_err(|e| e.to_string())?;
+
+    // Generate 32-byte random salt
+    let mut salt = [0u8; 32];
+    OsRng.fill_bytes(&mut salt);
+
+    // Derive 32-byte key from passphrase using PBKDF2-HMAC-SHA256
+    let mut derived_key = [0u8; 32];
+    pbkdf2_hmac::<Sha256>(passphrase.as_bytes(), &salt, 100_000, &mut derived_key);
+
+    // Generate 12-byte random nonce
+    let mut nonce_bytes = [0u8; 12];
+    OsRng.fill_bytes(&mut nonce_bytes);
+
+    // Encrypt with AES-256-GCM
+    let key = Key::<Aes256Gcm>::from_slice(&derived_key);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(nonce, json_payload.as_bytes())
+        .map_err(|_| "Encryption failed".to_string())?;
+
+    // Wire format: salt[32] + nonce[12] + ciphertext_with_tag
+    let mut wire = Vec::with_capacity(32 + 12 + ciphertext.len());
+    wire.extend_from_slice(&salt);
+    wire.extend_from_slice(&nonce_bytes);
+    wire.extend_from_slice(&ciphertext);
+
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&wire);
+    Ok(format!("KK_VAULT_{}", b64))
+}

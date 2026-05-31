@@ -41,7 +41,8 @@ fn main() {
             commands::validate_key,
             commands::get_api_key,
             commands::list_routing_events,
-            commands::clear_routing_events
+            commands::clear_routing_events,
+            commands::export_vault
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

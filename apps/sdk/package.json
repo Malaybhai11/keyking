@@ -1,0 +1,38 @@
+{
+  "name": "keyking-sdk",
+  "version": "1.1.0",
+  "description": "Zero-Trust Serverless SDK for KeyKing — Route LLM API calls with automatic failover, no proxy needed.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "keyking",
+    "llm",
+    "api-gateway",
+    "openai",
+    "groq",
+    "anthropic",
+    "rate-limit",
+    "failover",
+    "zero-trust"
+  ],
+  "author": "Malaybhai11",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Malaybhai11/keyking"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^5.0.0"
+  }
+}

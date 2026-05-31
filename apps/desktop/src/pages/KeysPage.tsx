@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Eye, EyeOff, Shield, CheckCircle, Loader, KeySquare } from 'lucide-react'
+import { Plus, Trash2, Eye, EyeOff, Shield, CheckCircle, Loader, KeySquare, Rocket, Copy, Check, X, Lock } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
 interface KeyEntry {
@@ -20,6 +20,15 @@ export default function KeysPage() {
   const [validationResults, setValidationResults] = useState<Record<string, boolean>>({})
   const [isEncrypting, setIsEncrypting] = useState(false)
   const [encryptingStep, setEncryptingStep] = useState(0)
+
+  // Export modal state
+  const [showExport, setShowExport] = useState(false)
+  const [exportPassphrase, setExportPassphrase] = useState('')
+  const [showPassphrase, setShowPassphrase] = useState(false)
+  const [exportResult, setExportResult] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const providers = ['OpenAI', 'Groq', 'Gemini', 'Mistral', 'Anthropic', 'xAI', 'DeepSeek', 'OpenRouter', 'Cohere']
 
@@ -91,6 +100,41 @@ export default function KeysPage() {
     }
   }
 
+  const handleExport = async () => {
+    if (!exportPassphrase) return
+    setIsExporting(true)
+    setExportError('')
+    setExportResult('')
+    try {
+      const result = await invoke<string>('export_vault', { passphrase: exportPassphrase })
+      setExportResult(result)
+    } catch (err) {
+      console.error('Export failed:', err)
+      setExportError(`Export failed: ${err}`)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(exportResult)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      console.error('Failed to copy')
+    }
+  }
+
+  const closeExportModal = () => {
+    setShowExport(false)
+    setExportPassphrase('')
+    setShowPassphrase(false)
+    setExportResult('')
+    setExportError('')
+    setCopied(false)
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {isEncrypting && (
@@ -150,21 +194,204 @@ export default function KeysPage() {
         </div>
       )}
 
+      {/* Export Modal */}
+      {showExport && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-[#0f0f11]/95 backdrop-blur-xl border border-amber-500/20 rounded-2xl p-8 w-[560px] max-h-[90vh] overflow-y-auto shadow-[0_0_60px_rgba(245,158,11,0.12)] space-y-6 relative overflow-hidden">
+            {/* Decorative blurs */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/8 blur-3xl rounded-full -mr-24 -mt-24"></div>
+            <div className="absolute bottom-0 left-0 w-36 h-36 bg-purple-500/5 blur-3xl rounded-full -ml-18 -mb-18"></div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-purple-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+                  <Rocket className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl text-white tracking-tight">Deploy to Serverless</h3>
+                  <p className="text-sm text-gray-400">Export your encrypted vault for cloud use</p>
+                </div>
+              </div>
+              <button
+                onClick={closeExportModal}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!exportResult ? (
+              /* Passphrase Input Phase */
+              <div className="space-y-5 relative z-10">
+                <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4">
+                  <p className="text-sm text-gray-300 leading-relaxed">
+                    <span className="text-amber-400 font-semibold">Your keys will be re-encrypted</span> with a password you choose.
+                    The exported vault string can be used with the <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-300 text-xs">keyking-sdk</code> package in any serverless environment.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+                    <Lock className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                    Vault Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassphrase ? 'text' : 'password'}
+                      value={exportPassphrase}
+                      onChange={(e) => setExportPassphrase(e.target.value)}
+                      placeholder="Enter a strong password..."
+                      className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white font-mono focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all shadow-inner"
+                      onKeyDown={(e) => e.key === 'Enter' && handleExport()}
+                    />
+                    <button
+                      onClick={() => setShowPassphrase(!showPassphrase)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      {showPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {exportError && (
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-rose-400 text-sm">
+                    {exportError}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleExport}
+                  disabled={!exportPassphrase || isExporting}
+                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:from-amber-400 hover:to-amber-500 transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)] disabled:shadow-none flex items-center justify-center gap-2"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Encrypting vault...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4" />
+                      Encrypt & Export
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              /* Result Phase */
+              <div className="space-y-5 relative z-10">
+                {/* Success banner */}
+                <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-emerald-400 font-semibold text-sm">Vault exported successfully</p>
+                    <p className="text-gray-400 text-xs mt-0.5">{keys.length} key{keys.length !== 1 ? 's' : ''} encrypted with your password</p>
+                  </div>
+                </div>
+
+                {/* Encrypted vault string */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Encrypted Vault</label>
+                    <button
+                      onClick={copyToClipboard}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        copied
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-white/10'
+                      }`}
+                    >
+                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                  <div className="bg-black/60 border border-white/5 rounded-xl p-4 max-h-32 overflow-y-auto">
+                    <code className="text-xs text-amber-300/90 break-all leading-relaxed font-mono">
+                      {exportResult}
+                    </code>
+                  </div>
+                </div>
+
+                {/* Usage Guide */}
+                <div className="border-t border-white/5 pt-5">
+                  <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <Rocket className="w-4 h-4 text-amber-500" />
+                    Quick Setup Guide
+                  </h4>
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1.5 font-medium">1. Install the SDK</p>
+                      <div className="bg-black/60 border border-white/5 rounded-lg p-3">
+                        <code className="text-xs text-emerald-400 font-mono">npm install keyking-sdk</code>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1.5 font-medium">2. Add to your environment variables</p>
+                      <div className="bg-black/60 border border-white/5 rounded-lg p-3">
+                        <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">{`KK_VAULT="${exportResult.slice(0, 32)}..."
+KK_VAULT_PASS="your-vault-password"`}</pre>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1.5 font-medium">3. Use in a Next.js API route</p>
+                      <div className="bg-black/60 border border-white/5 rounded-lg p-3">
+                        <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">{`import { KeyKing } from "keyking-sdk";
+
+const kk = new KeyKing({
+  vault: process.env.KK_VAULT!,
+  password: process.env.KK_VAULT_PASS!,
+});
+
+export async function POST(req: Request) {
+  const key = kk.getKey("OpenAI");
+  // Use key with your AI provider...
+}`}</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={closeExportModal}
+                  className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl font-semibold hover:bg-white/10 transition-all"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white mb-2">API Keys</h2>
           <p className="text-gray-400 text-sm">Manage and securely vault your provider API keys.</p>
         </div>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg ${
-            showAdd 
-              ? 'bg-white/10 text-white hover:bg-white/20 border border-white/10' 
-              : 'bg-gradient-to-r from-amber-500 to-amber-600 text-black hover:from-amber-400 hover:to-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-          }`}
-        >
-          {showAdd ? 'Cancel' : <><Plus className="w-4 h-4" /> Add New Key</>}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => { setShowExport(true); setExportResult(''); setExportPassphrase(''); setExportError(''); }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-400 hover:to-indigo-500 shadow-[0_0_15px_rgba(139,92,246,0.2)]"
+          >
+            <Rocket className="w-4 h-4" /> Deploy to Serverless
+          </button>
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg ${
+              showAdd 
+                ? 'bg-white/10 text-white hover:bg-white/20 border border-white/10' 
+                : 'bg-gradient-to-r from-amber-500 to-amber-600 text-black hover:from-amber-400 hover:to-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+            }`}
+          >
+            {showAdd ? 'Cancel' : <><Plus className="w-4 h-4" /> Add New Key</>}
+          </button>
+        </div>
       </div>
 
       {showAdd && (
