@@ -9,7 +9,7 @@ set -e
 
 # ─────────────────────────── Configuration ────────────────────────────
 APP_NAME="keyking"
-VERSION="1.2.0"
+VERSION="1.3.0"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/keyking"
 GITHUB_REPO="Malaybhai11/keyking"
@@ -168,11 +168,11 @@ progress_bar() {
   # Filled portion with gradient
   for ((i = 0; i < filled; i++)); do
     if [ $i -lt $((filled / 3)) ]; then
-      printf "${BLUE}█${RESET}"
+      printf "${MAGENTA}█${RESET}"
     elif [ $i -lt $((filled * 2 / 3)) ]; then
-      printf "${CYAN}█${RESET}"
+      printf "${BR_MAGENTA}█${RESET}"
     else
-      printf "${BR_CYAN}█${RESET}"
+      printf "${BR_YELLOW}█${RESET}"
     fi
   done
 
@@ -254,9 +254,9 @@ clear 2>/dev/null || true
 # ─────────────────── Splash Screen ────────────────────
 echo ""
 echo ""
-echo -e "${BR_YELLOW}      ██╗  ██╗███████╗██╗   ██╗██╗  ██╗██╗███╗   ██╗ ██████╗ ${RESET}"
-echo -e "${BR_YELLOW}      ██║ ██╔╝██╔════╝╚██╗ ██╔╝██║ ██╔╝██║████╗  ██║██╔════╝ ${RESET}"
-echo -e "${BR_YELLOW}      █████╔╝ █████╗   ╚████╔╝ █████╔╝ ██║██╔██╗ ██║██║  ███╗${RESET}"
+echo -e "${BR_MAGENTA}      ██╗  ██╗███████╗██╗   ██╗██╗  ██╗██╗███╗   ██╗ ██████╗ ${RESET}"
+echo -e "${BR_MAGENTA}      ██║ ██╔╝██╔════╝╚██╗ ██╔╝██║ ██╔╝██║████╗  ██║██╔════╝ ${RESET}"
+echo -e "${BR_MAGENTA}      █████╔╝ █████╗   ╚████╔╝ █████╔╝ ██║██╔██╗ ██║██║  ███╗${RESET}"
 echo -e "${BR_YELLOW}      ██╔═██╗ ██╔══╝    ╚██╔╝  ██╔═██╗ ██║██║╚██╗██║██║   ██║${RESET}"
 echo -e "${BR_YELLOW}      ██║  ██╗███████╗   ██║   ██║  ██╗██║██║ ╚████║╚██████╔╝${RESET}"
 echo -e "${BR_YELLOW}      ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ${RESET}"
