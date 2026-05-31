@@ -33,7 +33,7 @@ import {
 
 export default function Home() {
   // Navigation & Interactive Tabs
-  const [activeTab, setActiveTab] = useState<"curl" | "python" | "node" | "env">("curl");
+  const [activeTab, setActiveTab] = useState<"curl" | "python" | "node" | "env" | "sdk">("curl");
   
   // Coming Soon Popup Modal State
   const [showComingSoon, setShowComingSoon] = useState(false);
@@ -169,7 +169,17 @@ const response = await openai.chat.completions.create({
 console.log(response.choices[0].message.content);`,
     env: `# Set environment variables to override standard SDK routing
 export OPENAI_BASE_URL=http://localhost:8787/v1
-export OPENAI_API_KEY=${systemKey}`
+export OPENAI_API_KEY=${systemKey}`,
+    sdk: `import { KeyKing } from "@keyking/sdk";
+
+// Initialize KeyKing SDK with your exported vault
+const kk = new KeyKing({ vaultPath: "./vault.kk" });
+
+const response = await kk.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Hello from Serverless!" }],
+});
+console.log(response.choices[0].message.content);`
   };
 
   return (
@@ -180,11 +190,11 @@ export OPENAI_API_KEY=${systemKey}`
           <span className="inline-flex items-center gap-4">
             <Sparkles className="w-3.5 h-3.5 text-[#fde047] fill-[#fde047] shrink-0" />
             <Crown className="w-3.5 h-3.5 text-[#fde047] fill-[#fde047] shrink-0" />
-            <span>ZERO-TRUST LLM AGGREGATOR</span>
+            <span>DESKTOP PROXY FOR VIBE-CODING</span>
             <Sparkles className="w-3.5 h-3.5 text-[#fde047] fill-[#fde047] shrink-0" />
-            <span>AES-256-GCM LOCAL ENCRYPTION</span>
+            <span>SERVERLESS NPM SDK FOR PRODUCTION</span>
             <Sparkles className="w-3.5 h-3.5 text-[#fde047] fill-[#fde047] shrink-0" />
-            <span>HARDWARE FINGERPRINT ENCRYPTED</span>
+            <span>ZERO-TRUST DESKTOP VAULT</span>
             <Sparkles className="w-3.5 h-3.5 text-[#fde047] fill-[#fde047] shrink-0" />
             <span>DROP-IN OPENAI SDK COMPATIBLE</span>
             <Sparkles className="w-3.5 h-3.5 text-[#fde047] fill-[#fde047] shrink-0" />
@@ -521,12 +531,13 @@ export OPENAI_API_KEY=${systemKey}`
 
             {/* Tabs Selector */}
             <div className="flex flex-col gap-2 font-display text-xs font-bold uppercase tracking-wider">
-              {(["curl", "python", "node", "env"] as const).map((tab) => {
+              {(["curl", "python", "node", "env", "sdk"] as const).map((tab) => {
                 const label = {
                   curl: "cURL Command",
                   python: "OpenAI Python SDK",
                   node: "OpenAI Node.js SDK",
-                  env: "Environment Setup"
+                  env: "Environment Setup",
+                  sdk: "@keyking/sdk (NPM)"
                 }[tab];
                 return (
                   <button
@@ -788,7 +799,7 @@ export OPENAI_API_KEY=${systemKey}`
           {[
             {
               q: "Where are upstream API credentials stored?",
-              a: "Your unencrypted credentials never leave your local environment. They are stored securely in configuration files (vault.json) on your device. Prior to write operations, credentials are encrypted using AES-256-GCM. Decryption keys are derived locally using PBKDF2 with 310,000 iterations from your machine's unique hardware fingerprint, preventing exfiltration even if configuration files are copied to another device."
+              a: "Your unencrypted credentials never leave your local environment. They are managed in the Desktop Vault and stored securely on your device, encrypted with AES-256-GCM using keys derived from your hardware fingerprint. When deploying to production using the Serverless SDK, you export a portable encrypted vault (vault.kk) locked with a separate deployment key, ensuring zero plaintext exposure in your cloud environments."
             },
             {
               q: "Does running the local proxy server introduce measurable latency?",

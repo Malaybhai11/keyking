@@ -15,8 +15,8 @@ const lexend = Lexend({
 });
 
 export const metadata: Metadata = {
-  title: "KeyKing — Zero-Trust LLM API Aggregator",
-  description: "AES-256-GCM local encrypted key vault, local drop-in Axum proxy, smart rate-limit routing, and model fallback translation.",
+  title: "KeyKing — The Developer Ecosystem for LLMs",
+  description: "Secure your AI credentials with KeyKing. Use the Desktop Proxy for local vibe-coding, the NPM SDK for serverless production deployment, and manage it all in the Desktop Vault.",
 };
 
 export default function RootLayout({
