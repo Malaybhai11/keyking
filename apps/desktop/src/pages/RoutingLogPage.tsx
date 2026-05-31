@@ -18,8 +18,8 @@ export default function RoutingLogPage() {
           <p className="text-gray-400 text-sm">Real-time gateway traffic and latency metrics.</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#050505]/80 border border-white/10 rounded-xl">
-            <Activity className="w-4 h-4 text-gray-300" />
+          <div className="flex items-center gap-2 px-4 py-2 bg-black/40 border border-white/5 rounded-xl">
+            <Activity className="w-4 h-4 text-amber-500" />
             <span className="text-sm font-medium text-gray-300">{events.length} events logged</span>
           </div>
           <button 
@@ -40,17 +40,17 @@ export default function RoutingLogPage() {
             placeholder="Filter by provider..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full bg-[#111] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:border-white/30 transition-all shadow-inner"
+            className="w-full bg-black/50 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all shadow-inner"
           />
         </div>
       </div>
 
-      <div className="keyking-card p-0 overflow-hidden border-white/10 bg-[#050505]/40 relative">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+      <div className="keyking-card p-0 overflow-hidden border-white/5 relative">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
         
         <table className="w-full text-left border-collapse relative z-10">
           <thead>
-            <tr className="bg-white/[0.02] border-b border-white/10 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+            <tr className="bg-black/40 border-b border-white/5 text-xs uppercase tracking-wider text-gray-400 font-semibold">
               <th className="py-4 px-6 font-medium">Time</th>
               <th className="py-4 px-6 font-medium">Provider</th>
               <th className="py-4 px-6 font-medium">Latency</th>
@@ -61,7 +61,7 @@ export default function RoutingLogPage() {
           <tbody className="divide-y divide-white/5">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-16 text-center text-gray-500 bg-white/[0.01]">
+                <td colSpan={5} className="py-16 text-center text-gray-500 bg-black/20">
                   <div className="flex flex-col items-center gap-3">
                     <Clock className="w-8 h-8 text-gray-600" />
                     <p>No routing events yet. Make a request through the proxy to see traffic.</p>
@@ -77,7 +77,7 @@ export default function RoutingLogPage() {
                   </span>
                 </td>
                 <td className="py-4 px-6">
-                  <span className="px-3 py-1.5 bg-[#111] border border-white/10 rounded-lg text-sm text-gray-200 font-medium">
+                  <span className="px-3 py-1.5 bg-black/50 border border-white/5 rounded-lg text-sm text-gray-200 font-medium">
                     {event.provider}
                   </span>
                 </td>
@@ -96,10 +96,10 @@ export default function RoutingLogPage() {
                   {event.tokens_used.toLocaleString()}
                 </td>
                 <td className="py-4 px-6 text-right">
-                  <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold border ${
+                  <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold border ${
                     event.success 
-                      ? 'bg-white/5 text-gray-300 border-white/10' 
-                      : 'bg-red-500/10 text-red-400 border-red-500/20'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                   }`}>
                     {event.success ? 'Success' : 'Failed'}
                   </span>

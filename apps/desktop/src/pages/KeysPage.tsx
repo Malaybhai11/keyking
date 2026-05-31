@@ -376,16 +376,16 @@ export async function POST(req: Request) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setShowExport(true); setExportResult(''); setExportPassphrase(''); setExportError(''); }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all bg-white/5 text-gray-200 border border-white/10 hover:bg-white/10 hover:text-white"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-400 hover:to-indigo-500 shadow-[0_0_15px_rgba(139,92,246,0.2)]"
           >
-            <Shield className="w-4 h-4" /> Export Vault
+            <Shield className="w-4 h-4" /> Deploy to Serverless
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg ${
               showAdd 
-                ? 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-white/10' 
-                : 'bg-white text-black hover:bg-gray-200'
+                ? 'bg-white/10 text-white hover:bg-white/20 border border-white/10' 
+                : 'bg-gradient-to-r from-amber-500 to-amber-600 text-black hover:from-amber-400 hover:to-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
             }`}
           >
             {showAdd ? 'Cancel' : <><Plus className="w-4 h-4" /> Add New Key</>}
@@ -394,11 +394,11 @@ export async function POST(req: Request) {
       </div>
 
       {showAdd && (
-        <div className="keyking-card bg-[#050505] border-white/10 animate-fade-in relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+        <div className="keyking-card bg-[#111115] border-amber-500/20 shadow-[0_4px_30px_rgba(245,158,11,0.05)] animate-fade-in relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
           
           <h3 className="font-semibold text-lg text-white mb-5 flex items-center gap-2 relative z-10">
-            <KeySquare className="w-5 h-5 text-gray-400" />
+            <KeySquare className="w-5 h-5 text-amber-500" />
             Add New API Key
           </h3>
           
@@ -408,7 +408,7 @@ export async function POST(req: Request) {
               <select
                 value={newProvider}
                 onChange={(e) => setNewProvider(e.target.value)}
-                className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-white appearance-none focus:outline-none focus:border-white/30 transition-all shadow-inner"
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white appearance-none focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all shadow-inner"
               >
                 {providers.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
@@ -422,7 +422,7 @@ export async function POST(req: Request) {
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
                   placeholder="sk-..."
-                  className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 pr-12 text-white font-mono focus:outline-none focus:border-white/30 transition-all shadow-inner"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white font-mono focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all shadow-inner"
                 />
                 <button
                   onClick={() => setShowKey(!showKey)}
@@ -437,7 +437,7 @@ export async function POST(req: Request) {
               <button
                 onClick={addKey}
                 disabled={!newKey}
-                className="w-full md:w-auto px-8 py-3 bg-white text-black rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 transition-all shadow-sm flex items-center justify-center gap-2"
+                className="w-full md:w-auto px-8 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:from-amber-400 hover:to-amber-500 transition-all shadow-[0_0_15px_rgba(245,158,11,0.2)] disabled:shadow-none flex items-center justify-center gap-2"
               >
                 Save Key
               </button>
@@ -446,10 +446,10 @@ export async function POST(req: Request) {
         </div>
       )}
 
-      <div className="keyking-card p-0 overflow-hidden border-white/10 bg-[#050505]/40">
+      <div className="keyking-card p-0 overflow-hidden border-white/5">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-white/[0.02] border-b border-white/10 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+            <tr className="bg-black/40 border-b border-white/5 text-xs uppercase tracking-wider text-gray-400 font-semibold">
               <th className="py-4 px-6 font-medium">Provider</th>
               <th className="py-4 px-6 font-medium">Masked Key</th>
               <th className="py-4 px-6 font-medium">Status</th>
@@ -459,7 +459,7 @@ export async function POST(req: Request) {
           <tbody className="divide-y divide-white/5">
             {keys.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-12 text-center text-gray-500 bg-white/[0.01]">
+                <td colSpan={4} className="py-12 text-center text-gray-500 bg-black/20">
                   <div className="flex flex-col items-center gap-3">
                     <KeySquare className="w-8 h-8 text-gray-600" />
                     <p>No keys in your vault. Securely add your first API key.</p>
@@ -473,15 +473,15 @@ export async function POST(req: Request) {
                 <tr key={key.id} className="hover:bg-white/[0.02] transition-colors group">
                   <td className="py-4 px-6 font-medium text-gray-200">{key.provider}</td>
                   <td className="py-4 px-6">
-                    <code className="bg-[#111] border border-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-300 tracking-wider">
+                    <code className="bg-black/50 border border-white/5 px-3 py-1.5 rounded-lg text-sm text-gray-300 tracking-wider">
                       {key.masked_key}
                     </code>
                   </td>
                   <td className="py-4 px-6">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
                       validationResult 
-                        ? 'bg-white/5 text-gray-300 border-white/10' 
-                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                     }`}>
                       <Shield className="w-3.5 h-3.5" />
                       {validationResult ? 'Verified' : 'Invalid'}
