@@ -255,11 +255,11 @@ console.log(response.choices[0].message.content);`
             </div>
 
             <h1 className="font-display font-black text-3xl sm:text-5xl lg:text-[54px] tracking-tight leading-[0.95] uppercase">
-              The KeyKing <br />
-              Developer <br />
+              Never Hit <br />
+              Rate Limits <br />
               <span className="relative inline-block z-10 px-2 py-0.5 my-0.5">
                 <span className="absolute inset-0 bg-[#fde047] border-[3px] border-black -skew-x-2 -rotate-1 -z-10 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></span>
-                Ecosystem
+                Again
               </span>
             </h1>
 
