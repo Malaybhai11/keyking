@@ -176,7 +176,7 @@ function App() {
           <h1 className="text-4xl font-black font-display tracking-tight uppercase mb-2">KeyKing</h1>
           <p className="text-sm font-medium text-neo-dark/80 mb-10">Secure your API keys with zero-trust local encryption. Please sign in to continue.</p>
           <button
-            onClick={() => invoke('open_browser', { url: "http://localhost:3000/auth/app-login" })}
+            onClick={() => invoke('open_browser', { url: "https://keyking.vercel.app/auth/app-login" })}
             className="flex items-center gap-2 bg-neo-pink text-white px-6 py-4 border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all w-full justify-center cursor-pointer"
           >
             <LogIn className="w-6 h-6" />
