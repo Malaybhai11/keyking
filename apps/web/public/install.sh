@@ -9,7 +9,7 @@ set -e
 
 # ─────────────────────────── Configuration ────────────────────────────
 APP_NAME="keyking"
-VERSION="2.0.0"
+VERSION="2.0.1"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/keyking"
 GITHUB_REPO="Malaybhai11/keyking"
@@ -441,8 +441,8 @@ if [ "$DOWNLOAD_SUCCESS" = false ]; then
     for dir in "${SEARCH_DIRS[@]}"; do
         (sleep 0.2) &
         spinner "Scanning ${BR_YELLOW}${dir}${RESET}" $!
-        if [ -f "$dir/keyking-desktop" ]; then
-            LOCAL_BIN="$dir/keyking-desktop"
+        if [ -f "$dir/keyking" ]; then
+            LOCAL_BIN="$dir/keyking"
             break
         fi
     done

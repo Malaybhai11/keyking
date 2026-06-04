@@ -93,11 +93,11 @@ jobs:
         if: matrix.os_name == 'linux'
         run: |
           VERSION=$(grep '"version"' apps/desktop/src-tauri/tauri.conf.json | head -1 | sed 's/.*: *"\(.*\)".*/\1/')
-          BINARY_PATH=$(find apps/desktop/src-tauri/target/release/bundle -name "*.AppImage" -o -name "key-king" -o -name "keyking-desktop" 2>/dev/null | head -1)
+          BINARY_PATH=$(find apps/desktop/src-tauri/target/release/bundle -name "*.AppImage" -o -name "key-king" -o -name "keyking-desktop" -o -name "keyking" 2>/dev/null | head -1)
           
           # If no bundle binary, use the raw release binary
           if [ -z "$BINARY_PATH" ]; then
-            BINARY_PATH="apps/desktop/src-tauri/target/release/keyking-desktop"
+            BINARY_PATH="apps/desktop/src-tauri/target/release/keyking"
           fi
           
           if [ -f "$BINARY_PATH" ]; then
@@ -114,10 +114,10 @@ jobs:
         if: matrix.os_name == 'darwin'
         run: |
           VERSION=$(grep '"version"' apps/desktop/src-tauri/tauri.conf.json | head -1 | sed 's/.*: *"\(.*\)".*/\1/')
-          BINARY_PATH=$(find apps/desktop/src-tauri/target -name "Key King" -o -name "keyking-desktop" 2>/dev/null | grep -v deps | head -1)
+          BINARY_PATH=$(find apps/desktop/src-tauri/target -name "Key King" -o -name "keyking-desktop" -o -name "keyking" 2>/dev/null | grep -v deps | head -1)
           
           if [ -z "$BINARY_PATH" ]; then
-            BINARY_PATH="apps/desktop/src-tauri/target/universal-apple-darwin/release/keyking-desktop"
+            BINARY_PATH="apps/desktop/src-tauri/target/universal-apple-darwin/release/keyking"
           fi
           
           if [ -f "$BINARY_PATH" ]; then
@@ -134,7 +134,7 @@ jobs:
         if: matrix.os_name == 'windows'
         shell: pwsh
         run: |
-          $binary = Get-ChildItem -Path "apps/desktop/src-tauri/target/release" -Filter "keyking-desktop.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $binary = Get-ChildItem -Path "apps/desktop/src-tauri/target/release" -Filter "keyking.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           
           if ($binary) {
             New-Item -ItemType Directory -Force -Path "$env:TEMP/keyking-package" | Out-Null
