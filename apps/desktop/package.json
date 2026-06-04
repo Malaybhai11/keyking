@@ -21,7 +21,8 @@
     "react-router-dom": "^6.26.0",
     "zustand": "^5.0.0",
     "lucide-react": "^0.460.0",
-    "recharts": "^2.13.0"
+    "recharts": "^2.13.0",
+    "posthog-js": "^1.212.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

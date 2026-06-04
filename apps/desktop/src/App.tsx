@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { Key, LayoutDashboard, Activity, ShieldAlert, Settings, Terminal } from 'lucide-react'
+import { Key, LayoutDashboard, Activity, ShieldAlert, Settings, Terminal, LogIn } from 'lucide-react'
 import DashboardPage from './pages/DashboardPage'
 import KeysPage from './pages/KeysPage'
 import RoutingLogPage from './pages/RoutingLogPage'
 import SettingsPage from './pages/SettingsPage'
 import AnomaliesPage from './pages/AnomaliesPage'
+import { usePostHog } from 'posthog-js/react'
 
 export interface RoutingEvent {
   id: string
@@ -106,6 +107,14 @@ function Sidebar() {
         }>
           <Settings className="w-4 h-4" /> Settings
         </NavLink>
+        <button onClick={() => {
+            localStorage.removeItem('auth_session')
+            window.location.reload()
+          }} 
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 text-gray-400 hover:text-red-400 hover:bg-white/5"
+        >
+          <LogIn className="w-4 h-4" /> Sign Out
+        </button>
       </nav>
       
       <div className="p-5 m-4 rounded-2xl bg-gradient-to-b from-white/[0.04] to-transparent border border-white/5 relative overflow-hidden group hover:border-white/10 transition-colors">
@@ -131,6 +140,56 @@ function Sidebar() {
 }
 
 function App() {
+  const [session, setSession] = useState<{session_id: string, user_id: string} | null>(() => {
+    const saved = localStorage.getItem('auth_session')
+    return saved ? JSON.parse(saved) : null
+  })
+
+  const posthog = usePostHog()
+
+  useEffect(() => {
+    const unlisten = listen<{session_id: string, user_id: string}>('auth-success', (event) => {
+      setSession(event.payload)
+      localStorage.setItem('auth_session', JSON.stringify(event.payload))
+      if (posthog) {
+        posthog.identify(event.payload.user_id)
+      }
+    })
+    return () => { unlisten.then(fn => fn()) }
+  }, [posthog])
+
+  useEffect(() => {
+    if (session && posthog) {
+      posthog.identify(session.user_id)
+    }
+  }, [session, posthog])
+
+  const logout = () => {
+    setSession(null)
+    localStorage.removeItem('auth_session')
+  }
+
+  if (!session) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-neo-bg text-gray-100 font-sans">
+        <div className="p-8 bg-[#0c0c0e] border border-white/5 shadow-2xl rounded-2xl flex flex-col items-center max-w-sm text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 flex items-center justify-center border border-amber-500/30 mb-6">
+            <Key className="w-8 h-8 text-amber-500" />
+          </div>
+          <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 mb-2">KeyKing</h1>
+          <p className="text-sm text-gray-400 mb-8">Secure your API keys with zero-trust local encryption. Please sign in to continue.</p>
+          <button
+            onClick={() => invoke('open_browser', { url: "http://localhost:3000/auth/app-login" })}
+            className="flex items-center gap-2 bg-amber-500 text-black px-6 py-3 rounded-xl font-bold hover:bg-amber-400 transition-colors w-full justify-center"
+          >
+            <LogIn className="w-5 h-5" />
+            Sign In with Google
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <EventProvider>
       <div className="flex h-screen text-gray-100 font-sans selection:bg-amber-500/30 selection:text-white bg-transparent">

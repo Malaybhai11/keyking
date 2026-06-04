@@ -85,7 +85,7 @@ pub struct ProxyRouter {
     system_key: Arc<String>,
     circuit_breaker: CircuitBreaker,
     quota_map: QuotaMap,
-    app_handle: Option<tauri::AppHandle>,
+    pub app_handle: Option<tauri::AppHandle>,
 }
 
 impl ProxyRouter {

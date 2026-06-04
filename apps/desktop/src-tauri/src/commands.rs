@@ -191,3 +191,15 @@ pub async fn export_vault(
     let b64 = base64::engine::general_purpose::STANDARD.encode(&wire);
     Ok(format!("KK_VAULT_{}", b64))
 }
+
+#[tauri::command]
+pub fn open_browser(url: String) {
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd").args(["/C", "start", &url]).spawn().ok();
+
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(&url).spawn().ok();
+
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(&url).spawn().ok();
+}

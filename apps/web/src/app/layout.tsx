@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   description: "Secure your AI credentials with KeyKing. Use the Desktop Proxy for local vibe-coding, the NPM SDK for serverless production deployment, and manage it all in the Desktop Vault.",
 };
 
+import { PHProvider } from "./providers";
+import PostHogPageView from "./PostHogPageView";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,9 +33,12 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${lexend.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col font-body bg-neo-bg text-black" suppressHydrationWarning>
-        {children}
-      </body>
+      <PHProvider>
+        <body className="min-h-full flex flex-col font-body bg-neo-bg text-black" suppressHydrationWarning>
+          <PostHogPageView />
+          {children}
+        </body>
+      </PHProvider>
     </html>
   );
 }
