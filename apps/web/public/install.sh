@@ -9,7 +9,7 @@ set -e
 
 # ─────────────────────────── Configuration ────────────────────────────
 APP_NAME="keyking"
-VERSION="1.3.0"
+VERSION="2.0.0"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/keyking"
 GITHUB_REPO="Malaybhai11/keyking"
@@ -103,7 +103,7 @@ term_width() {
 hr() {
   local w
   w=$(term_width)
-  printf "${DIM}${CYAN}"
+  printf "${BR_YELLOW}${CYAN}"
   printf '─%.0s' $(seq 1 "$w")
   printf "${RESET}\n"
 }
@@ -133,7 +133,7 @@ spinner() {
 
   while kill -0 "$pid" 2>/dev/null; do
     local frame="${SPINNER_FRAMES[$((i % ${#SPINNER_FRAMES[@]}))]}"
-    printf "\r  ${BR_CYAN}${frame}${RESET} ${DIM}${msg}${RESET}  "
+    printf "\r  ${BR_CYAN}${frame}${RESET} ${BR_YELLOW}${msg}${RESET}  "
     i=$((i + 1))
     sleep "$delay"
   done
@@ -162,8 +162,8 @@ progress_bar() {
   local filled=$((current * bar_width / total))
   local empty=$((bar_width - filled))
 
-  printf "\r  ${BR_MAGENTA}${ARROW}${RESET} ${DIM}%-14s${RESET}" "$label"
-  printf " ${DIM}[${RESET}"
+  printf "\r  ${BR_MAGENTA}${ARROW}${RESET} ${BR_YELLOW}%-14s${RESET}" "$label"
+  printf " ${BR_YELLOW}[${RESET}"
 
   # Filled portion with gradient
   for ((i = 0; i < filled; i++)); do
@@ -178,10 +178,10 @@ progress_bar() {
 
   # Empty portion
   for ((i = 0; i < empty; i++)); do
-    printf "${DIM}░${RESET}"
+    printf "${BR_YELLOW}░${RESET}"
   done
 
-  printf "${DIM}]${RESET} ${BR_WHITE}%3d%%${RESET}" "$percent"
+  printf "${BR_YELLOW}]${RESET} ${BR_WHITE}%3d%%${RESET}" "$percent"
 }
 
 # Print step header
@@ -198,25 +198,25 @@ step() {
 tell_joke() {
   local idx=$((RANDOM % ${#JOKES[@]}))
   echo ""
-  echo -e "  ${DIM}╭──────────────────────────────────────────────────────╮${RESET}"
-  echo -e "  ${DIM}│${RESET}  ${BR_YELLOW}😄 While you wait...${RESET}                                 ${DIM}│${RESET}"
-  echo -e "  ${DIM}│${RESET}                                                       ${DIM}│${RESET}"
+  echo -e "  ${BR_YELLOW}██████████████████████████████████████████████████████████${RESET}"
+  echo -e "  ${BR_YELLOW}█${RESET}  ${BR_YELLOW}😄 While you wait...${RESET}                                 ${BR_YELLOW}█${RESET}"
+  echo -e "  ${BR_YELLOW}█${RESET}                                                       ${BR_YELLOW}█${RESET}"
   # Word wrap the joke to fit the box
   local joke="${JOKES[$idx]}"
   local max_len=53
   while [ ${#joke} -gt 0 ]; do
     local line="${joke:0:$max_len}"
     joke="${joke:$max_len}"
-    printf "  ${DIM}│${RESET}  ${ITALIC}${CYAN}%-53s${RESET}  ${DIM}│${RESET}\n" "$line"
+    printf "  ${BR_YELLOW}█${RESET}  ${BOLD}${CYAN}%-53s${RESET}  ${BR_YELLOW}█${RESET}\n" "$line"
   done
-  echo -e "  ${DIM}╰──────────────────────────────────────────────────────╯${RESET}"
+  echo -e "  ${BR_YELLOW}██████████████████████████████████████████████████████████${RESET}"
   echo ""
 }
 
 # Random tip
 show_tip() {
   local idx=$((RANDOM % ${#TIPS[@]}))
-  echo -e "  ${DIM}${TIPS[$idx]}${RESET}"
+  echo -e "  ${BR_YELLOW}${TIPS[$idx]}${RESET}"
 }
 
 # Typewriter effect
@@ -308,14 +308,14 @@ OS_ICON="🐧"
 
 simulate_progress "Scanning..." 0.8
 
-echo -e "  ${DIM}┌─────────────────────────────────────────────┐${RESET}"
-echo -e "  ${DIM}│${RESET}  ${BR_WHITE}System Information${RESET}                          ${DIM}│${RESET}"
-echo -e "  ${DIM}├─────────────────────────────────────────────┤${RESET}"
-printf "  ${DIM}│${RESET}  ${DIAMOND} OS          ${BR_GREEN}%-29s${RESET}${DIM}│${RESET}\n" "${OS_ICON} ${OS_RAW}"
-printf "  ${DIM}│${RESET}  ${DIAMOND} Arch        ${BR_GREEN}%-29s${RESET}${DIM}│${RESET}\n" "${ARCH_DISPLAY}"
-printf "  ${DIM}│${RESET}  ${DIAMOND} Shell       ${BR_GREEN}%-29s${RESET}${DIM}│${RESET}\n" "${SHELL##*/}"
-printf "  ${DIM}│${RESET}  ${DIAMOND} User        ${BR_GREEN}%-29s${RESET}${DIM}│${RESET}\n" "$(whoami)"
-echo -e "  ${DIM}└─────────────────────────────────────────────┘${RESET}"
+echo -e "  ${BR_YELLOW}███████████████████████████████████████████████████${RESET}"
+echo -e "  ${BR_YELLOW}█${RESET}  ${BR_WHITE}System Information${RESET}                          ${BR_YELLOW}█${RESET}"
+echo -e "  ${BR_YELLOW}███████████████████████████████████████████████████${RESET}"
+printf "  ${BR_YELLOW}█${RESET}  ${DIAMOND} OS          ${BR_GREEN}%-29s${RESET}${BR_YELLOW}█${RESET}\n" "${OS_ICON} ${OS_RAW}"
+printf "  ${BR_YELLOW}█${RESET}  ${DIAMOND} Arch        ${BR_GREEN}%-29s${RESET}${BR_YELLOW}█${RESET}\n" "${ARCH_DISPLAY}"
+printf "  ${BR_YELLOW}█${RESET}  ${DIAMOND} Shell       ${BR_GREEN}%-29s${RESET}${BR_YELLOW}█${RESET}\n" "${SHELL##*/}"
+printf "  ${BR_YELLOW}█${RESET}  ${DIAMOND} User        ${BR_GREEN}%-29s${RESET}${BR_YELLOW}█${RESET}\n" "$(whoami)"
+echo -e "  ${BR_YELLOW}███████████████████████████████████████████████████${RESET}"
 
 sleep 0.3
 
@@ -355,7 +355,7 @@ EOT
     spinner "Writing default configuration" $!
 else
     (sleep 0.2) &
-    spinner "Configuration already exists ${DIM}(keeping yours)${RESET}" $!
+    spinner "Configuration already exists ${BR_YELLOW}(keeping yours)${RESET}" $!
 fi
 
 (sleep 0.4) &
@@ -384,8 +384,8 @@ fi
 URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/${BINARY_FILE}"
 LATEST_URL="https://github.com/${GITHUB_REPO}/releases/latest/download/${BINARY_FILE}"
 
-echo -e "  ${DIM}${ARROW} Target: ${UNDERLINE}${BINARY_FILE}${RESET}"
-echo -e "  ${DIM}${ARROW} Source: github.com/${GITHUB_REPO}/releases${RESET}"
+echo -e "  ${BR_YELLOW}${ARROW} Target: ${UNDERLINE}${BINARY_FILE}${RESET}"
+echo -e "  ${BR_YELLOW}${ARROW} Source: github.com/${GITHUB_REPO}/releases${RESET}"
 echo ""
 
 DOWNLOAD_SUCCESS=false
@@ -400,7 +400,7 @@ if curl -fsSLI "$URL" >/dev/null 2>&1; then
     if [ "$OS" = "windows" ]; then
         (curl -fsSL -o "$TMP_DIR/bundle.zip" "$URL") &
         spinner "Downloading ${BINARY_FILE}" $!
-        (unzip -q "$TMP_DIR/bundle.zip" -d "$TMP_DIR") &
+        (powershell.exe -Command "Expand-Archive -Path '$TMP_DIR/bundle.zip' -DestinationPath '$TMP_DIR' -Force") &
         spinner "Extracting archive" $!
     else
         (curl -fsSL "$URL" | tar -xz -C "$TMP_DIR") &
@@ -418,7 +418,7 @@ elif curl -fsSLI "$LATEST_URL" >/dev/null 2>&1; then
     if [ "$OS" = "windows" ]; then
         (curl -fsSL -o "$TMP_DIR/bundle.zip" "$LATEST_URL") &
         spinner "Downloading ${BINARY_FILE}" $!
-        (unzip -q "$TMP_DIR/bundle.zip" -d "$TMP_DIR") &
+        (powershell.exe -Command "Expand-Archive -Path '$TMP_DIR/bundle.zip' -DestinationPath '$TMP_DIR' -Force") &
         spinner "Extracting archive" $!
     else
         (curl -fsSL "$LATEST_URL" | tar -xz -C "$TMP_DIR") &
@@ -440,7 +440,7 @@ if [ "$DOWNLOAD_SUCCESS" = false ]; then
 
     for dir in "${SEARCH_DIRS[@]}"; do
         (sleep 0.2) &
-        spinner "Scanning ${DIM}${dir}${RESET}" $!
+        spinner "Scanning ${BR_YELLOW}${dir}${RESET}" $!
         if [ -f "$dir/keyking-desktop" ]; then
             LOCAL_BIN="$dir/keyking-desktop"
             break
@@ -454,8 +454,8 @@ if [ "$DOWNLOAD_SUCCESS" = false ]; then
         echo ""
         echo -e "  ${BG_RED}${BR_WHITE} ERROR ${RESET} ${BR_RED}Could not locate KeyKing binary${RESET}"
         echo ""
-        echo -e "  ${DIM}Try one of these:${RESET}"
-        echo -e "    ${ARROW} Build from source:  ${BR_CYAN}cargo build --release${RESET} ${DIM}(in apps/desktop/src-tauri)${RESET}"
+        echo -e "  ${BR_YELLOW}Try one of these:${RESET}"
+        echo -e "    ${ARROW} Build from source:  ${BR_CYAN}cargo build --release${RESET} ${BR_YELLOW}(in apps/desktop/src-tauri)${RESET}"
         echo -e "    ${ARROW} Wait for release:   ${BR_CYAN}https://github.com/${GITHUB_REPO}/releases${RESET}"
         echo ""
         rm -rf "$TMP_DIR"
@@ -483,7 +483,7 @@ if [ "$OS" = "windows" ]; then
     FINAL_PATH="$WIN_BIN_DIR/$APP_NAME"
 
     (sleep 0.5) &
-    spinner "Copying binary to ${DIM}${WIN_BIN_DIR}${RESET}" $!
+    spinner "Copying binary to ${BR_YELLOW}${WIN_BIN_DIR}${RESET}" $!
 
     echo ""
     echo -e "  ${BR_YELLOW}⚠${RESET}  Please add ${BR_CYAN}${WIN_BIN_DIR}${RESET} to your Windows PATH"
@@ -492,7 +492,7 @@ else
         mv "$TMP_DIR/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
         FINAL_PATH="$INSTALL_DIR/$APP_NAME"
         (sleep 0.3) &
-        spinner "Installing to ${DIM}${INSTALL_DIR}${RESET}" $!
+        spinner "Installing to ${BR_YELLOW}${INSTALL_DIR}${RESET}" $!
     else
         USER_BIN="$HOME/.local/bin"
         mkdir -p "$USER_BIN" 2>/dev/null || true
@@ -501,13 +501,13 @@ else
             INSTALL_DIR="$USER_BIN"
             FINAL_PATH="$USER_BIN/$APP_NAME"
             (sleep 0.3) &
-            spinner "Installing to ${DIM}${USER_BIN}${RESET}" $!
+            spinner "Installing to ${BR_YELLOW}${USER_BIN}${RESET}" $!
         else
             echo -e "  ${BR_YELLOW}🔒${RESET} Elevated permissions required..."
             sudo mv "$TMP_DIR/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
             FINAL_PATH="$INSTALL_DIR/$APP_NAME"
             (sleep 0.3) &
-            spinner "Installing to ${DIM}${INSTALL_DIR}${RESET} ${DIM}(sudo)${RESET}" $!
+            spinner "Installing to ${BR_YELLOW}${INSTALL_DIR}${RESET} ${BR_YELLOW}(sudo)${RESET}" $!
         fi
     fi
     chmod +x "${INSTALL_DIR}/${APP_NAME}"
@@ -568,26 +568,26 @@ echo ""
 # Installation summary card
 RESOLVED_PATH=$(which "$APP_NAME" 2>/dev/null || echo "$FINAL_PATH")
 
-echo -e "  ${DIM}┌──────────────────────────────────────────────────────────┐${RESET}"
-echo -e "  ${DIM}│${RESET}  ${BR_WHITE}Installation Summary${RESET}                                    ${DIM}│${RESET}"
-echo -e "  ${DIM}├──────────────────────────────────────────────────────────┤${RESET}"
-printf "  ${DIM}│${RESET}  ${CIRCLE} ${DIM}Version${RESET}     ${BR_CYAN}%-41s${RESET}${DIM}│${RESET}\n" "v${VERSION}"
-printf "  ${DIM}│${RESET}  ${CIRCLE} ${DIM}Binary${RESET}      ${BR_CYAN}%-41s${RESET}${DIM}│${RESET}\n" "${RESOLVED_PATH}"
-printf "  ${DIM}│${RESET}  ${CIRCLE} ${DIM}Config${RESET}      ${BR_CYAN}%-41s${RESET}${DIM}│${RESET}\n" "${CONFIG_DIR}/config.json"
-printf "  ${DIM}│${RESET}  ${CIRCLE} ${DIM}Proxy Port${RESET}  ${BR_CYAN}%-41s${RESET}${DIM}│${RESET}\n" "8787"
-echo -e "  ${DIM}└──────────────────────────────────────────────────────────┘${RESET}"
+echo -e "  ${BR_YELLOW}██████████████████████████████████████████████████████████████${RESET}"
+echo -e "  ${BR_YELLOW}█${RESET}  ${BR_WHITE}Installation Summary${RESET}                                    ${BR_YELLOW}█${RESET}"
+echo -e "  ${BR_YELLOW}██████████████████████████████████████████████████████████████${RESET}"
+printf "  ${BR_YELLOW}█${RESET}  ${CIRCLE} ${BR_YELLOW}Version${RESET}     ${BR_CYAN}%-41s${RESET}${BR_YELLOW}█${RESET}\n" "v${VERSION}"
+printf "  ${BR_YELLOW}█${RESET}  ${CIRCLE} ${BR_YELLOW}Binary${RESET}      ${BR_CYAN}%-41s${RESET}${BR_YELLOW}█${RESET}\n" "${RESOLVED_PATH}"
+printf "  ${BR_YELLOW}█${RESET}  ${CIRCLE} ${BR_YELLOW}Config${RESET}      ${BR_CYAN}%-41s${RESET}${BR_YELLOW}█${RESET}\n" "${CONFIG_DIR}/config.json"
+printf "  ${BR_YELLOW}█${RESET}  ${CIRCLE} ${BR_YELLOW}Proxy Port${RESET}  ${BR_CYAN}%-41s${RESET}${BR_YELLOW}█${RESET}\n" "8787"
+echo -e "  ${BR_YELLOW}██████████████████████████████████████████████████████████████${RESET}"
 echo ""
 
 # Quick start commands
 echo -e "  ${BR_WHITE}Quick Start:${RESET}"
 echo ""
-echo -e "  ${DIM}  # Start the zero-trust LLM proxy${RESET}"
+echo -e "  ${BR_YELLOW}  # Start the zero-trust LLM proxy${RESET}"
 echo -e "    ${BR_YELLOW}\$ keyking dev${RESET}"
 echo ""
-echo -e "  ${DIM}  # Add your first API key${RESET}"
+echo -e "  ${BR_YELLOW}  # Add your first API key${RESET}"
 echo -e "    ${BR_YELLOW}\$ keyking keys add openai sk-...${RESET}"
 echo ""
-echo -e "  ${DIM}  # Route requests through KeyKing${RESET}"
+echo -e "  ${BR_YELLOW}  # Route requests through KeyKing${RESET}"
 echo -e "    ${BR_YELLOW}\$ curl http://localhost:8787/v1/chat/completions \\\\${RESET}"
 echo -e "    ${BR_YELLOW}    -H 'Content-Type: application/json' \\\\${RESET}"
 echo -e "    ${BR_YELLOW}    -d '{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello!\"}]}'${RESET}"
@@ -598,11 +598,11 @@ echo ""
 
 # Final parting joke
 FINAL_JOKE_IDX=$((RANDOM % ${#JOKES[@]}))
-echo -e "  ${DIM}One last thing...${RESET}"
-echo -e "  ${ITALIC}${CYAN}${JOKES[$FINAL_JOKE_IDX]}${RESET}"
+echo -e "  ${BR_YELLOW}One last thing...${RESET}"
+echo -e "  ${BOLD}${CYAN}${JOKES[$FINAL_JOKE_IDX]}${RESET}"
 echo ""
-echo -e "  ${DIM}Star us on GitHub → ${BR_CYAN}https://github.com/${GITHUB_REPO}${RESET}"
-echo -e "  ${DIM}Need help?        → ${BR_CYAN}https://github.com/${GITHUB_REPO}/issues${RESET}"
+echo -e "  ${BR_YELLOW}Star us on GitHub → ${BR_CYAN}https://github.com/${GITHUB_REPO}${RESET}"
+echo -e "  ${BR_YELLOW}Need help?        → ${BR_CYAN}https://github.com/${GITHUB_REPO}/issues${RESET}"
 echo ""
 hr
 echo ""
@@ -618,27 +618,27 @@ if command -v "$APP_NAME" &>/dev/null; then
     LAUNCH_PID=$!
     sleep 1
     if kill -0 "$LAUNCH_PID" 2>/dev/null; then
-        echo -e "  ${BR_GREEN}${CHECKMARK}${RESET} KeyKing proxy is running ${DIM}(PID: ${LAUNCH_PID})${RESET}"
-        echo -e "  ${DIM}${ARROW} Listening on ${BR_CYAN}http://localhost:8787${RESET}"
+        echo -e "  ${BR_GREEN}${CHECKMARK}${RESET} KeyKing proxy is running ${BR_YELLOW}(PID: ${LAUNCH_PID})${RESET}"
+        echo -e "  ${BR_YELLOW}${ARROW} Listening on ${BR_CYAN}http://localhost:8787${RESET}"
         echo ""
-        echo -e "  ${DIM}Press ${BR_WHITE}Ctrl+C${RESET}${DIM} to stop the proxy${RESET}"
+        echo -e "  ${BR_YELLOW}Press ${BR_WHITE}Ctrl+C${RESET}${BR_YELLOW} to stop the proxy${RESET}"
     else
-        echo -e "  ${DIM}${ARROW} Run ${BR_YELLOW}keyking dev${RESET}${DIM} to start the proxy when you're ready.${RESET}"
+        echo -e "  ${BR_YELLOW}${ARROW} Run ${BR_YELLOW}keyking dev${RESET}${BR_YELLOW} to start the proxy when you're ready.${RESET}"
     fi
 elif [ -n "$FINAL_PATH" ] && [ -f "$FINAL_PATH" ]; then
     "$FINAL_PATH" dev &
     LAUNCH_PID=$!
     sleep 1
     if kill -0 "$LAUNCH_PID" 2>/dev/null; then
-        echo -e "  ${BR_GREEN}${CHECKMARK}${RESET} KeyKing proxy is running ${DIM}(PID: ${LAUNCH_PID})${RESET}"
-        echo -e "  ${DIM}${ARROW} Listening on ${BR_CYAN}http://localhost:8787${RESET}"
+        echo -e "  ${BR_GREEN}${CHECKMARK}${RESET} KeyKing proxy is running ${BR_YELLOW}(PID: ${LAUNCH_PID})${RESET}"
+        echo -e "  ${BR_YELLOW}${ARROW} Listening on ${BR_CYAN}http://localhost:8787${RESET}"
         echo ""
-        echo -e "  ${DIM}Press ${BR_WHITE}Ctrl+C${RESET}${DIM} to stop the proxy${RESET}"
+        echo -e "  ${BR_YELLOW}Press ${BR_WHITE}Ctrl+C${RESET}${BR_YELLOW} to stop the proxy${RESET}"
     else
-        echo -e "  ${DIM}${ARROW} Run ${BR_YELLOW}keyking dev${RESET}${DIM} to start the proxy when you're ready.${RESET}"
+        echo -e "  ${BR_YELLOW}${ARROW} Run ${BR_YELLOW}keyking dev${RESET}${BR_YELLOW} to start the proxy when you're ready.${RESET}"
     fi
 else
-    echo -e "  ${DIM}${ARROW} Run ${BR_YELLOW}keyking dev${RESET}${DIM} to start the proxy when you're ready.${RESET}"
+    echo -e "  ${BR_YELLOW}${ARROW} Run ${BR_YELLOW}keyking dev${RESET}${BR_YELLOW} to start the proxy when you're ready.${RESET}"
 fi
 
 echo ""
