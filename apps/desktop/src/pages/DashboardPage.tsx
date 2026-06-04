@@ -27,10 +27,10 @@ export default function DashboardPage() {
 
   const proxyUrl = `OPENAI_BASE_URL=http://localhost:${proxyPort}/v1`
   const stats = [
-    { label: 'Active Keys', value: String(keyCount), icon: Key, color: 'from-blue-500 to-cyan-400', bg: 'bg-blue-500/10' },
-    { label: 'Requests Today', value: String(successCount), icon: Activity, color: 'from-green-500 to-emerald-400', bg: 'bg-green-500/10' },
-    { label: 'Tokens Used', value: totalTokens > 0 ? totalTokens.toLocaleString() : '-', icon: Zap, color: 'from-amber-500 to-orange-400', bg: 'bg-amber-500/10' },
-    { label: 'Anomalies', value: '0', icon: AlertTriangle, color: 'from-red-500 to-rose-400', bg: 'bg-red-500/10' },
+    { label: 'Active Keys', value: String(keyCount), icon: Key, bg: 'bg-neo-cyan' },
+    { label: 'Requests Today', value: String(successCount), icon: Activity, bg: 'bg-neo-green' },
+    { label: 'Tokens Used', value: totalTokens > 0 ? totalTokens.toLocaleString() : '-', icon: Zap, bg: 'bg-neo-yellow' },
+    { label: 'Anomalies', value: '0', icon: AlertTriangle, bg: 'bg-neo-pink' },
   ]
 
   const maskedKey = systemKey ? systemKey.slice(0, 12) + '\u2022'.repeat(24) : ''
@@ -74,59 +74,55 @@ export OPENAI_API_KEY=${keyPrefix}...`
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Welcome to KeyKing</h2>
-        <p className="text-gray-400 text-sm">Your universal API gateway is running and ready to handle requests.</p>
+        <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">Dashboard</h2>
+        <p className="text-neo-dark/80 font-bold text-sm">Your universal API gateway is running and ready to handle requests.</p>
       </div>
 
       <div className="grid grid-cols-4 gap-5">
         {stats.map((stat) => (
-          <div key={stat.label} className="keyking-card group relative overflow-hidden">
-            <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-3xl opacity-20 bg-gradient-to-br ${stat.color} group-hover:opacity-40 transition-opacity duration-500`}></div>
-            <div className="flex flex-col gap-4 relative z-10">
-              <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center border border-white/5`}>
-                <stat.icon className={`w-5 h-5 bg-clip-text text-transparent bg-gradient-to-br ${stat.color} drop-shadow-md`} style={{ color: 'white' }} />
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white tracking-tight mb-1">{stat.value}</div>
-                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">{stat.label}</div>
+          <div key={stat.label} className="keyking-card flex flex-col justify-between h-32">
+            <div className="flex justify-between items-start">
+              <div className="text-4xl font-black font-display text-neo-dark tracking-tight">{stat.value}</div>
+              <div className={`w-10 h-10 border-3 border-neo-dark shadow-neo-sm flex items-center justify-center ${stat.bg}`}>
+                <stat.icon className="w-5 h-5 text-neo-dark" />
               </div>
             </div>
+            <div className="text-sm font-bold font-display text-neo-dark uppercase tracking-wider">{stat.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="keyking-card relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="bg-neo-yellow border-3 border-neo-dark shadow-neo-md p-6 relative overflow-hidden group hover:-translate-y-1 hover:shadow-neo-lg transition-all duration-200">
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-5">
-            <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
-              <Key className="w-5 h-5 text-amber-500" />
+            <div className="p-2 bg-white border-3 border-neo-dark shadow-neo-sm">
+              <Key className="w-5 h-5 text-neo-dark" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Your System API Key</h3>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <h3 className="text-xl font-black font-display uppercase text-neo-dark">Your System API Key</h3>
+              <p className="text-sm font-bold text-neo-dark mt-0.5">
                 Use this key to authenticate requests to your local proxy. It is generated securely per session.
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3 bg-black/60 border border-white/10 rounded-xl p-2 pl-4 font-mono text-sm shadow-inner group-hover:border-amber-500/30 transition-colors">
-            <code className="flex-1 break-all text-amber-100 tracking-wider">
+          <div className="flex items-center gap-3 bg-white border-3 border-neo-dark p-2 pl-4 font-mono text-sm shadow-neo-sm">
+            <code className="flex-1 break-all text-neo-dark font-bold text-lg tracking-wider">
               {showKey ? systemKey : maskedKey}
             </code>
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => setShowKey(!showKey)}
-                className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors border border-white/5"
+                className="p-3 bg-neo-bg hover:bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all cursor-pointer"
                 title={showKey ? "Hide key" : "Show key"}
               >
-                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
               <button
                 onClick={handleCopyKey}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-black rounded-lg text-sm font-bold hover:from-amber-400 hover:to-amber-500 transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_20px_rgba(245,158,11,0.5)]"
+                className="flex items-center gap-2 px-6 py-3 bg-neo-pink text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
               >
-                {copiedKey ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copiedKey ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                 {copiedKey ? 'Copied' : 'Copy Key'}
               </button>
             </div>
@@ -135,50 +131,50 @@ export OPENAI_API_KEY=${keyPrefix}...`
       </div>
 
       <div className="grid grid-cols-2 gap-6">
-        <div className="keyking-card flex flex-col h-full">
+        <div className="keyking-card flex flex-col h-full bg-neo-cyan">
           <div className="flex items-center gap-2 mb-5">
-            <Terminal className="w-5 h-5 text-gray-400" />
-            <h3 className="text-lg font-semibold text-white">Quick Integration</h3>
+            <Terminal className="w-6 h-6 text-neo-dark" />
+            <h3 className="text-xl font-black font-display uppercase text-neo-dark">Quick Integration</h3>
           </div>
           <div className="space-y-4 text-sm flex-1">
-            <div className="bg-black/50 border border-white/5 rounded-xl p-4 font-mono text-xs hover:border-white/10 transition-colors shadow-inner">
-              <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5">
-                <span className="text-gray-500 font-sans font-medium text-[11px] uppercase tracking-wider">Standard Request</span>
+            <div className="bg-white border-3 border-neo-dark p-4 font-mono text-xs shadow-neo-sm">
+              <div className="flex items-center justify-between mb-2 pb-2 border-b-3 border-neo-dark">
+                <span className="text-neo-dark font-display font-black text-xs uppercase tracking-wider">Standard Request</span>
               </div>
-              <pre className="whitespace-pre-wrap text-emerald-400/90 leading-relaxed">{curlExample}</pre>
+              <pre className="whitespace-pre-wrap text-neo-dark font-bold leading-relaxed">{curlExample}</pre>
             </div>
-            <div className="bg-black/50 border border-white/5 rounded-xl p-4 font-mono text-xs hover:border-white/10 transition-colors shadow-inner">
-              <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5">
-                <span className="text-gray-500 font-sans font-medium text-[11px] uppercase tracking-wider">Streaming Request</span>
+            <div className="bg-white border-3 border-neo-dark p-4 font-mono text-xs shadow-neo-sm">
+              <div className="flex items-center justify-between mb-2 pb-2 border-b-3 border-neo-dark">
+                <span className="text-neo-dark font-display font-black text-xs uppercase tracking-wider">Streaming Request</span>
               </div>
-              <pre className="whitespace-pre-wrap text-emerald-400/90 leading-relaxed">{streamExample}</pre>
+              <pre className="whitespace-pre-wrap text-neo-dark font-bold leading-relaxed">{streamExample}</pre>
             </div>
           </div>
         </div>
 
         <div className="space-y-6 flex flex-col h-full">
-          <div className="keyking-card">
+          <div className="keyking-card bg-neo-pink">
             <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-5 h-5 text-blue-400" />
-              <h3 className="text-lg font-semibold text-white">Environment Variables</h3>
+              <Zap className="w-6 h-6 text-white" />
+              <h3 className="text-xl font-black font-display uppercase text-white">Environment Variables</h3>
             </div>
-            <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+            <p className="text-sm font-bold text-white mb-4 leading-relaxed">
               Drop these into your `.env` file to instantly route all your OpenAI SDK traffic through KeyKing without changing any code.
             </p>
-            <div className="bg-black/50 border border-white/5 rounded-xl p-4 font-mono text-xs shadow-inner">
-              <pre className="whitespace-pre-wrap text-blue-300/90 leading-relaxed">{envExample}</pre>
+            <div className="bg-white border-3 border-neo-dark p-4 font-mono text-xs shadow-neo-sm">
+              <pre className="whitespace-pre-wrap text-neo-dark font-bold leading-relaxed">{envExample}</pre>
             </div>
           </div>
 
-          <div className="keyking-card flex-1">
-            <h3 className="text-lg font-semibold text-white mb-4">Proxy Configuration</h3>
-            <div className="flex items-center justify-between bg-black/60 border border-white/10 rounded-xl p-1 pl-4 font-mono text-sm shadow-inner group">
-              <code className="text-gray-300">{proxyUrl}</code>
+          <div className="keyking-card flex-1 bg-white">
+            <h3 className="text-xl font-black font-display uppercase text-neo-dark mb-4">Proxy Configuration</h3>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-neo-bg border-3 border-neo-dark p-2 pl-4 gap-4 font-mono text-sm shadow-neo-sm">
+              <code className="text-neo-dark font-bold break-all">{proxyUrl}</code>
               <button
                 onClick={handleCopyUrl}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-white/5 text-gray-300 rounded-lg text-xs font-semibold hover:bg-white/10 hover:text-white transition-colors m-1 border border-white/5 group-hover:border-white/10"
+                className="flex shrink-0 items-center gap-2 px-4 py-3 bg-neo-yellow text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
               >
-                {copiedUrl ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copiedUrl ? 'Copied' : 'Copy'}
               </button>
             </div>

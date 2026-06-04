@@ -16,26 +16,29 @@ export default function AnomaliesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Anomalies</h2>
+    <div className="space-y-8 pb-12">
+      <div>
+        <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">Anomalies</h2>
+        <p className="text-neo-dark/80 font-bold text-sm">Monitor network irregularities and suspicious requests.</p>
+      </div>
       
       {anomalies.length === 0 && (
-        <div className="keyking-card text-center py-12">
-          <AlertTriangle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">No anomalies detected</p>
+        <div className="bg-neo-green border-3 border-neo-dark shadow-neo-md text-center py-16">
+          <AlertTriangle className="w-16 h-16 text-neo-dark mx-auto mb-4" />
+          <p className="text-neo-dark font-black font-display uppercase text-xl">No anomalies detected</p>
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         {anomalies.map(anomaly => (
-          <div key={anomaly.id} className="keyking-card flex items-center justify-between">
+          <div key={anomaly.id} className="bg-white border-3 border-neo-dark shadow-neo-sm p-4 flex items-center justify-between hover:-translate-y-1 hover:shadow-neo-md transition-all">
             <div>
-              <span className="px-2 py-1 bg-red-900/50 text-red-400 rounded text-xs font-bold">{anomaly.type}</span>
-              <p className="text-sm text-gray-400 mt-1">{new Date(anomaly.detectedAt).toLocaleString()}</p>
+              <span className="px-3 py-1 bg-neo-pink border-2 border-neo-dark text-white font-display font-black uppercase text-xs">{anomaly.type}</span>
+              <p className="text-sm font-bold text-neo-dark/80 mt-2">{new Date(anomaly.detectedAt).toLocaleString()}</p>
             </div>
             {!anomaly.resolved && (
-              <button onClick={() => resolveAnomaly(anomaly.id)} className="p-2 bg-green-900/50 text-green-400 rounded-lg hover:bg-green-900 transition">
-                <Check className="w-4 h-4" />
+              <button onClick={() => resolveAnomaly(anomaly.id)} className="p-3 bg-neo-green border-3 border-neo-dark text-neo-dark hover:bg-neo-yellow transition-all cursor-pointer">
+                <Check className="w-5 h-5" />
               </button>
             )}
           </div>

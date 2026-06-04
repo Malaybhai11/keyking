@@ -14,19 +14,19 @@ export default function RoutingLogPage() {
     <div className="space-y-8 pb-12">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Routing Log</h2>
-          <p className="text-gray-400 text-sm">Real-time gateway traffic and latency metrics.</p>
+          <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">Routing Log</h2>
+          <p className="text-neo-dark/80 font-bold text-sm">Real-time gateway traffic and latency metrics.</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-4 py-2 bg-black/40 border border-white/5 rounded-xl">
-            <Activity className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-medium text-gray-300">{events.length} events logged</span>
+          <div className="flex items-center gap-2 px-4 py-2 bg-neo-cyan border-3 border-neo-dark shadow-neo-sm">
+            <Activity className="w-5 h-5 text-neo-dark" />
+            <span className="text-sm font-black font-display text-neo-dark uppercase tracking-wider">{events.length} events logged</span>
           </div>
           <button 
             onClick={clearEvents} 
-            className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl hover:bg-rose-500/20 hover:border-rose-500/30 transition-all font-semibold"
+            className="flex items-center gap-2 px-6 py-3 bg-neo-pink text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-5 h-5" />
             Clear Logs
           </button>
         </div>
@@ -34,72 +34,70 @@ export default function RoutingLogPage() {
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
-          <Filter className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
+          <Filter className="w-5 h-5 text-neo-dark absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Filter by provider..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full bg-black/50 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all shadow-inner"
+            className="w-full bg-white border-3 border-neo-dark pl-12 pr-4 py-3 text-neo-dark font-bold placeholder:text-neo-dark/50 focus:outline-none focus:bg-neo-yellow transition-all shadow-neo-sm"
           />
         </div>
       </div>
 
-      <div className="keyking-card p-0 overflow-hidden border-white/5 relative">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
-        
+      <div className="bg-white border-3 border-neo-dark shadow-neo-md p-0 overflow-hidden">
         <table className="w-full text-left border-collapse relative z-10">
           <thead>
-            <tr className="bg-black/40 border-b border-white/5 text-xs uppercase tracking-wider text-gray-400 font-semibold">
-              <th className="py-4 px-6 font-medium">Time</th>
-              <th className="py-4 px-6 font-medium">Provider</th>
-              <th className="py-4 px-6 font-medium">Latency</th>
-              <th className="py-4 px-6 font-medium">Tokens</th>
-              <th className="py-4 px-6 font-medium text-right">Status</th>
+            <tr className="bg-neo-yellow border-b-3 border-neo-dark text-sm font-display font-black uppercase tracking-wider text-neo-dark">
+              <th className="py-4 px-6">Time</th>
+              <th className="py-4 px-6">Provider</th>
+              <th className="py-4 px-6">Latency</th>
+              <th className="py-4 px-6">Tokens</th>
+              <th className="py-4 px-6 text-right">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y-3 divide-neo-dark">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-16 text-center text-gray-500 bg-black/20">
+                <td colSpan={5} className="py-16 text-center text-neo-dark bg-neo-bg">
                   <div className="flex flex-col items-center gap-3">
-                    <Clock className="w-8 h-8 text-gray-600" />
-                    <p>No routing events yet. Make a request through the proxy to see traffic.</p>
+                    <Clock className="w-10 h-10 text-neo-dark" />
+                    <p className="font-bold">No routing events yet. Make a request through the proxy to see traffic.</p>
                   </div>
                 </td>
               </tr>
             )}
             {filtered.map(event => (
-              <tr key={event.id} className="hover:bg-white/[0.02] transition-colors">
+              <tr key={event.id} className="hover:bg-neo-bg transition-colors">
                 <td className="py-4 px-6">
-                  <span className="font-mono text-xs text-gray-400">
+                  <span className="font-mono text-sm font-bold text-neo-dark">
                     {new Date(event.timestamp * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </td>
                 <td className="py-4 px-6">
-                  <span className="px-3 py-1.5 bg-black/50 border border-white/5 rounded-lg text-sm text-gray-200 font-medium">
+                  <span className="px-3 py-1.5 bg-white border-2 border-neo-dark shadow-neo-sm text-sm font-black font-display uppercase text-neo-dark">
                     {event.provider}
                   </span>
                 </td>
                 <td className="py-4 px-6">
-                  <div className="flex items-center gap-2">
-                    <div className={`h-1.5 rounded-full w-12 bg-white/5 overflow-hidden`}>
+                  <div className="flex items-center gap-3">
+                    <div className="h-3 rounded-none w-16 bg-white border-2 border-neo-dark shadow-neo-sm overflow-hidden">
                       <div 
-                        className={`h-full ${event.latency_ms < 500 ? 'bg-emerald-500' : event.latency_ms < 1500 ? 'bg-amber-500' : 'bg-rose-500'}`} 
+                        className={`h-full ${event.latency_ms < 500 ? 'bg-neo-green border-r-2 border-neo-dark' : event.latency_ms < 1500 ? 'bg-neo-yellow border-r-2 border-neo-dark' : 'bg-neo-pink border-r-2 border-neo-dark'}`} 
                         style={{ width: `${Math.min(100, (event.latency_ms / 2000) * 100)}%` }} 
                       />
                     </div>
-                    <span className="font-mono text-sm text-gray-300">{event.latency_ms}ms</span>
+                    <span className="font-mono font-bold text-sm text-neo-dark">{event.latency_ms}ms</span>
                   </div>
                 </td>
-                <td className="py-4 px-6 text-gray-300 font-medium">
+                <td className="py-4 px-6 text-neo-dark font-black text-lg">
                   {event.tokens_used.toLocaleString()}
                 </td>
                 <td className="py-4 px-6 text-right">
-                  <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold border ${
+                  <span className={`inline-flex items-center justify-center px-3 py-1 font-display uppercase text-xs font-black border-2 border-neo-dark shadow-neo-sm ${
                     event.success 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      ? 'bg-neo-green text-neo-dark' 
+                      : 'bg-neo-pink text-white'
                   }`}>
                     {event.success ? 'Success' : 'Failed'}
                   </span>

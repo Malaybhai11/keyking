@@ -1,14 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-black text-gray-100;
-    font-family: 'Inter', system-ui, sans-serif;
+    @apply bg-neo-bg text-neo-dark;
     -webkit-font-smoothing: antialiased;
-    background-image: radial-gradient(circle at 50% 0%, #16161a 0%, #000000 80%);
-    background-attachment: fixed;
   }
   
   code, pre {
@@ -17,34 +16,34 @@
 
   /* Custom Scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 12px;
+    height: 12px;
   }
   ::-webkit-scrollbar-track {
-    background: transparent;
+    @apply bg-neo-bg border-l-3 border-neo-dark;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full border-2 border-black;
+    @apply bg-neo-yellow border-3 border-neo-dark;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    @apply bg-neo-pink;
   }
 }
 
 @layer components {
   .keyking-card {
-    @apply bg-[#0c0c0e]/80 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 shadow-xl transition-all duration-300;
+    @apply bg-white border-3 border-neo-dark rounded-none p-6 shadow-neo-md transition-all duration-200;
   }
   
   .keyking-card:hover {
-    @apply border-white/10 shadow-2xl;
+    @apply -translate-y-1 shadow-neo-lg;
   }
   
   .keyking-accent {
-    @apply text-amber-500;
+    @apply text-neo-pink;
   }
   
   .glass-panel {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl;
+    @apply bg-neo-cyan border-3 border-neo-dark;
   }
 }

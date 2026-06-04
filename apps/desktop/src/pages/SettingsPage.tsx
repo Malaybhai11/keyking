@@ -6,36 +6,39 @@ export default function SettingsPage() {
   const [port, setPort] = useState(8787)
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Settings</h2>
+    <div className="space-y-8 pb-12">
+      <div>
+        <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">Settings</h2>
+        <p className="text-neo-dark/80 font-bold text-sm">Configure your proxy and account.</p>
+      </div>
       
-      <div className="keyking-card">
-        <h3 className="text-lg font-semibold mb-4">Account</h3>
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${tier === 'ultra' ? 'bg-amber-900/50' : 'bg-gray-800'}`}>
-            {tier === 'ultra' ? <Crown className="w-5 h-5 text-[#f59e0b]" /> : <Zap className="w-5 h-5 text-gray-400" />}
+      <div className="bg-neo-yellow border-3 border-neo-dark shadow-neo-md p-6">
+        <h3 className="text-2xl font-black font-display uppercase mb-4 text-neo-dark">Account</h3>
+        <div className="flex items-center gap-4">
+          <div className={`p-4 border-3 border-neo-dark shadow-neo-sm bg-white`}>
+            {tier === 'ultra' ? <Crown className="w-8 h-8 text-neo-dark" /> : <Zap className="w-8 h-8 text-neo-dark" />}
           </div>
           <div>
-            <div className="font-bold">{tier === 'ultra' ? 'Ultra' : 'Free'} Tier</div>
-            <div className="text-sm text-gray-400">{tier === 'ultra' ? 'Unlimited everything' : '2 keys, 30 req/min'}</div>
+            <div className="font-black font-display text-2xl uppercase text-neo-dark">{tier === 'ultra' ? 'Ultra' : 'Free'} Tier</div>
+            <div className="text-sm font-bold text-neo-dark/80">{tier === 'ultra' ? 'Unlimited everything' : '2 keys, 30 req/min'}</div>
           </div>
         </div>
         {tier === 'free' && (
-          <button className="mt-4 w-full py-2 bg-[#f59e0b] text-black rounded-lg font-bold hover:bg-[#d97706] transition">
+          <button className="mt-6 w-full py-4 bg-neo-pink text-white border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all shadow-neo-sm cursor-pointer">
             Upgrade to Ultra — $2/month
           </button>
         )}
       </div>
       
-      <div className="keyking-card">
-        <h3 className="text-lg font-semibold mb-4">Proxy Settings</h3>
+      <div className="bg-neo-cyan border-3 border-neo-dark shadow-neo-md p-6">
+        <h3 className="text-2xl font-black font-display uppercase mb-4 text-neo-dark">Proxy Settings</h3>
         <div className="flex items-center gap-4">
-          <label className="text-sm text-gray-400">Port</label>
+          <label className="text-sm font-bold font-display uppercase text-neo-dark">Port</label>
           <input
             type="number"
             value={port}
             onChange={(e) => setPort(Number(e.target.value))}
-            className="w-24 bg-[#1f1f1f] border border-gray-700 rounded-lg px-3 py-2"
+            className="w-32 bg-white border-3 border-neo-dark shadow-neo-sm px-4 py-3 font-bold font-mono text-neo-dark focus:outline-none focus:bg-neo-yellow transition-colors"
           />
         </div>
       </div>
