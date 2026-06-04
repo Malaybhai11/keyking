@@ -165,10 +165,6 @@ function App() {
     }
   }, [session, posthog])
 
-  const logout = () => {
-    setSession(null)
-    localStorage.removeItem('auth_session')
-  }
 
   if (!session) {
     return (
