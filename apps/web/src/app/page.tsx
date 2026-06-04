@@ -47,9 +47,19 @@ export default function Home() {
   
   // FAQ toggles
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  
-  // Copied utility states
+
+  // Interaction states
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [isWindows, setIsWindows] = useState(false);
+
+  useEffect(() => {
+    setIsWindows(navigator.userAgent.toLowerCase().includes("win"));
+  }, []);
+
+  const installCommand = isWindows 
+    ? "iwr https://keyking.vercel.app/install.ps1 -useb | iex" 
+    : "curl -fsSL https://keyking.vercel.app/install.sh | bash";
+
 
   // System State simulation
   const [metricKeys, setMetricKeys] = useState(3);
@@ -271,10 +281,10 @@ console.log(response.choices[0].message.content);`
               <div className="bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
                 <div className="truncate flex items-center gap-1.5">
                   <span className="text-[#ff2a85] font-bold">Install Desktop Proxy:</span> 
-                  <span>curl -fsSL https://keyking.vercel.app/install.sh | bash</span>
+                  <span>{installCommand}</span>
                 </div>
                 <button 
-                  onClick={() => copyToClipboard("curl -fsSL https://keyking.vercel.app/install.sh | bash", "install")}
+                  onClick={() => copyToClipboard(installCommand, "install")}
                   className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded border border-neutral-700 transition shrink-0 cursor-pointer"
                   title="Copy installer command"
                 >
