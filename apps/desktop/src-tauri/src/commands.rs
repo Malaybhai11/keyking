@@ -1,6 +1,13 @@
 use crate::vault::{Vault, StoredKeyEntry};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingRule {
+    pub provider: String,
+    pub model: String,
+}
 
 pub struct VaultState {
     pub vault: Mutex<Vault>,
@@ -43,6 +50,84 @@ pub async fn get_api_key(
     state: tauri::State<'_, SystemKey>,
 ) -> Result<String, String> {
     Ok(state.0.to_string())
+}
+
+#[tauri::command]
+pub async fn get_routing_rules(state: tauri::State<'_, SharedVault>) -> Result<Vec<RoutingRule>, String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("routing_rules.json");
+    if path.exists() {
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let rules: Vec<RoutingRule> = serde_json::from_str(&content).unwrap_or_default();
+        Ok(rules)
+    } else {
+        Ok(vec![])
+    }
+}
+
+#[tauri::command]
+pub async fn save_routing_rules(state: tauri::State<'_, SharedVault>, rules: Vec<RoutingRule>) -> Result<(), String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("routing_rules.json");
+    let content = serde_json::to_string_pretty(&rules).map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[derive(Serialize)]
+pub struct ModelInfo {
+    id: String,
+    provider: String,
+}
+
+#[tauri::command]
+pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Result<Vec<ModelInfo>, String> {
+    // For now, return a static robust list based on configured providers.
+    // Dynamic fetching can be added here by making HTTP requests to each key.
+    let vault = state.vault.lock().await;
+    let keys = vault.list_keys();
+    let mut providers: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for k in keys {
+        providers.insert(k.provider);
+    }
+    
+    let mut models = Vec::new();
+    if providers.contains("OpenAI") {
+        models.push(ModelInfo { id: "gpt-4o".into(), provider: "OpenAI".into() });
+        models.push(ModelInfo { id: "gpt-4-turbo".into(), provider: "OpenAI".into() });
+        models.push(ModelInfo { id: "gpt-3.5-turbo".into(), provider: "OpenAI".into() });
+        models.push(ModelInfo { id: "o1-preview".into(), provider: "OpenAI".into() });
+        models.push(ModelInfo { id: "o1-mini".into(), provider: "OpenAI".into() });
+    }
+    if providers.contains("Anthropic") {
+        models.push(ModelInfo { id: "claude-3-5-sonnet-20240620".into(), provider: "Anthropic".into() });
+        models.push(ModelInfo { id: "claude-3-opus-20240229".into(), provider: "Anthropic".into() });
+        models.push(ModelInfo { id: "claude-3-haiku-20240307".into(), provider: "Anthropic".into() });
+    }
+    if providers.contains("Groq") {
+        models.push(ModelInfo { id: "llama-3.3-70b-versatile".into(), provider: "Groq".into() });
+        models.push(ModelInfo { id: "llama-3.1-8b-instant".into(), provider: "Groq".into() });
+        models.push(ModelInfo { id: "mixtral-8x7b-32768".into(), provider: "Groq".into() });
+        models.push(ModelInfo { id: "gemma2-9b-it".into(), provider: "Groq".into() });
+    }
+    if providers.contains("Gemini") {
+        models.push(ModelInfo { id: "gemini-1.5-pro".into(), provider: "Gemini".into() });
+        models.push(ModelInfo { id: "gemini-1.5-flash".into(), provider: "Gemini".into() });
+    }
+    if providers.contains("Mistral") {
+        models.push(ModelInfo { id: "mistral-large-latest".into(), provider: "Mistral".into() });
+        models.push(ModelInfo { id: "mistral-medium-latest".into(), provider: "Mistral".into() });
+    }
+    if providers.contains("xAI") {
+        models.push(ModelInfo { id: "grok-beta".into(), provider: "xAI".into() });
+        models.push(ModelInfo { id: "grok-2-latest".into(), provider: "xAI".into() });
+    }
+    if providers.contains("DeepSeek") {
+        models.push(ModelInfo { id: "deepseek-chat".into(), provider: "DeepSeek".into() });
+        models.push(ModelInfo { id: "deepseek-coder".into(), provider: "DeepSeek".into() });
+    }
+    
+    Ok(models)
 }
 
 #[tauri::command]

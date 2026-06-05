@@ -397,23 +397,48 @@ impl ProxyRouter {
 
         let is_stream = req.stream.unwrap_or(false);
         let start = std::time::Instant::now();
-        let primary_provider = model_to_provider(&req.model);
-
-        // Try primary provider first
-        if let Ok(response) = router.try_provider(primary_provider, &req, is_stream, start).await {
-            return response;
+        
+        let rules_path = router.vault.vault.lock().await.data_dir.join("routing_rules.json");
+        let mut custom_rules: Vec<crate::commands::RoutingRule> = vec![];
+        if rules_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&rules_path) {
+                custom_rules = serde_json::from_str(&content).unwrap_or_default();
+            }
         }
 
-        // Fallback: try all other providers that have keys
-        let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere"];
-        for &provider in &all_providers {
-            if provider == primary_provider {
-                continue;
+        if !custom_rules.is_empty() {
+            for rule in &custom_rules {
+                let mut modified_req = req.clone();
+                modified_req.model = rule.model.clone();
+                if let Ok(response) = router.try_provider(&rule.provider, &modified_req, is_stream, start).await {
+                    return response;
+                }
             }
-            if let Ok(response) = router.try_provider(provider, &req, is_stream, start).await {
+        } else {
+            let primary_provider = model_to_provider(&req.model);
+
+            // Try primary provider first
+            if let Ok(response) = router.try_provider(primary_provider, &req, is_stream, start).await {
                 return response;
             }
+
+            // Fallback: try all other providers that have keys
+            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere"];
+            for &provider in &all_providers {
+                if provider == primary_provider {
+                    continue;
+                }
+                if let Ok(response) = router.try_provider(provider, &req, is_stream, start).await {
+                    return response;
+                }
+            }
         }
+
+        let primary_provider = if !custom_rules.is_empty() {
+            &custom_rules[0].provider
+        } else {
+            model_to_provider(&req.model)
+        };
 
         // Check KEYKING_DEV_KEY env var as last resort
         let env_key = std::env::var("KEYKING_DEV_KEY").unwrap_or_default();

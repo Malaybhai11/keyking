@@ -57,8 +57,8 @@ export default function Home() {
   }, []);
 
   const installCommand = isWindows 
-    ? "iwr https://keyking.vercel.app/install.ps1 -useb | iex" 
-    : "curl -fsSL https://keyking.vercel.app/install.sh | bash";
+    ? "iwr https://keyking.ledgion.in/install.ps1 -useb | iex" 
+    : "curl -fsSL https://keyking.ledgion.in/install.sh | bash";
 
 
   // System State simulation

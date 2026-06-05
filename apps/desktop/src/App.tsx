@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { Key, LayoutDashboard, Activity, ShieldAlert, Settings, Terminal, LogIn } from 'lucide-react'
+import { Key, LayoutDashboard, Activity, ShieldAlert, Settings, Terminal, LogIn, GripVertical } from 'lucide-react'
 import DashboardPage from './pages/DashboardPage'
 import KeysPage from './pages/KeysPage'
 import RoutingLogPage from './pages/RoutingLogPage'
 import SettingsPage from './pages/SettingsPage'
 import AnomaliesPage from './pages/AnomaliesPage'
+import RoutingRulesPage from './pages/RoutingRulesPage'
 import { usePostHog } from 'posthog-js/react'
 
 export interface RoutingEvent {
@@ -96,6 +97,11 @@ function Sidebar() {
         }>
           <Activity className="w-5 h-5" /> Routing Log
         </NavLink>
+        <NavLink to="/priority" className={({isActive}) =>
+          `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
+        }>
+          <GripVertical className="w-5 h-5" /> Priority
+        </NavLink>
         <NavLink to="/anomalies" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
@@ -176,7 +182,7 @@ function App() {
           <h1 className="text-4xl font-black font-display tracking-tight uppercase mb-2">KeyKing</h1>
           <p className="text-sm font-medium text-neo-dark/80 mb-10">Secure your API keys with zero-trust local encryption. Please sign in to continue.</p>
           <button
-            onClick={() => invoke('open_browser', { url: "https://keyking.vercel.app/auth/app-login" })}
+            onClick={() => invoke('open_browser', { url: "https://keyking.ledgion.in/auth/app-login" })}
             className="flex items-center gap-2 bg-neo-pink text-white px-6 py-4 border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all w-full justify-center cursor-pointer"
           >
             <LogIn className="w-6 h-6" />
@@ -197,6 +203,7 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/keys" element={<KeysPage />} />
               <Route path="/routing-log" element={<RoutingLogPage />} />
+              <Route path="/priority" element={<RoutingRulesPage />} />
               <Route path="/anomalies" element={<AnomaliesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>

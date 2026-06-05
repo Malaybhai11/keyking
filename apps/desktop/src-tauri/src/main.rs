@@ -43,7 +43,10 @@ fn main() {
             commands::list_routing_events,
             commands::clear_routing_events,
             commands::export_vault,
-            commands::open_browser
+            commands::open_browser,
+            commands::get_routing_rules,
+            commands::save_routing_rules,
+            commands::get_available_models
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

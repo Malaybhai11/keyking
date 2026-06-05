@@ -6,10 +6,12 @@ import './index.css'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
 
-const posthogKey = import.meta.env.VITE_POSTHOG_KEY || import.meta.env.VITE_POSTHOG_PROJECT_TOKEN;
+const posthogKey = import.meta.env.VITE_POSTHOG_KEY || import.meta.env.VITE_POSTHOG_PROJECT_TOKEN || 'phc_wsBwU2tc3HXLoaYwo9ikBfZc2vGqXcmCyAnfu2Hy8uyw';
 if (posthogKey) {
   posthog.init(posthogKey, {
-    api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+    api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://t.keyking.ledgion.in',
+    ui_host: 'https://us.posthog.com',
+    defaults: '2026-05-30',
     person_profiles: 'identified_only',
     autocapture: true,
     session_recording: {
