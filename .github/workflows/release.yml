@@ -80,7 +80,7 @@ jobs:
 
             **One-line install (Linux/macOS):**
             ```bash
-            curl -fsSL https://keyking.dev/install.sh | bash
+            curl -fsSL https://keyking.ledgion.in/install.sh | bash
             ```
 
             **Or download the installer for your platform below.**

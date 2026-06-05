@@ -28,7 +28,7 @@ export default function DownloadPage() {
       : "curl -fsSL https://keyking.ledgion.in/install.sh | bash";
   };
 
-  const LATEST_VERSION = "v2.0.2";
+  const LATEST_VERSION = "v2.0.3";
   const GITHUB_REPO = "Malaybhai11/keyking";
   
   const DOWNLOAD_LINKS = {
