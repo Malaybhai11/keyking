@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { ShieldAlert, GripVertical, Save, Activity, Check } from 'lucide-react'
+import { ShieldAlert, GripVertical, Save, Check } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -74,7 +74,6 @@ function SortableRuleItem({ rule, index }: { rule: RoutingRule, index: number })
 
 export default function RoutingRulesPage() {
   const [rules, setRules] = useState<RoutingRule[]>([])
-  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -93,18 +92,15 @@ export default function RoutingRulesPage() {
     try {
       const savedRules = await invoke<RoutingRule[]>('get_routing_rules')
       const models = await invoke<ModelInfo[]>('get_available_models')
-      
-      setAvailableModels(models)
 
       if (savedRules.length > 0) {
         setRules(savedRules)
       } else {
-        // If no rules exist, create a default priority from available models
-        const defaultRules = models.map(m => ({ provider: m.provider, model: m.id }))
+        const defaultRules = models.map((m) => ({ provider: m.provider, model: m.id }))
         setRules(defaultRules)
       }
-    } catch (err) {
-      console.error('Failed to load routing data', err)
+    } catch (error) {
+      console.error('Failed to load data:', error)
     }
   }
 
