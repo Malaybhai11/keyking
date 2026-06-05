@@ -260,7 +260,7 @@ console.log(response.choices[0].message.content);`
           <div className="lg:col-span-5 space-y-4 min-w-0">
             <div className="inline-flex">
               <NeoBadge variant="green" interactive className="text-[10px] tracking-widest font-mono">
-                <Star className="w-3.5 h-3.5 fill-current" /> Will be trusted by 10k developers Soon,
+                <Star className="w-3.5 h-3.5 fill-current animate-pulse" /> UNLOCK 1.7 BILLION FREE TOKENS / MONTH
               </NeoBadge>
             </div>
 
@@ -274,7 +274,7 @@ console.log(response.choices[0].message.content);`
             </h1>
 
             <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed max-w-xl">
-              A comprehensive toolchain for secure LLM API access. Use the Desktop Proxy for local vibe-coding, deploy the NPM SDK to production, and manage everything securely in the Desktop Vault.
+              A comprehensive toolchain for secure LLM API access. Route across every credible free-tier LLM provider utilizing 1.7 Billion free tokens per month. Bring your own keys; we just point requests at whichever provider still has budget left.
             </p>
 
             <div className="flex flex-col gap-2 max-w-xl">
@@ -478,6 +478,46 @@ console.log(response.choices[0].message.content);`
 
       </div>
 
+      </section>
+
+      {/* FREE PROVIDERS SECTION */}
+      <section id="catalog" className="max-w-7xl mx-auto px-4 md:px-8 py-16 border-t-[4px] border-black bg-[#ff2a85] text-white">
+        <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
+          <h2 className="font-display font-black text-3xl sm:text-5xl uppercase tracking-tight">
+            The Free Tier Catalog
+          </h2>
+          <p className="text-sm font-medium">
+            Over 100+ free models across 16 providers. Mistral alone contributes ~1B; everything else is bonus. Get your keys below, drop them in KeyKing, and never pay for tokens again.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[
+            { name: "Mistral La Plateforme", limit: "~1B/mo shared", models: "Mistral Large/Medium, Codestral", url: "https://console.mistral.ai", color: "light" },
+            { name: "Google Gemini", limit: "~3M/mo per model", models: "Gemini 2.5 Flash, Flash-Lite", url: "https://aistudio.google.com", color: "yellow" },
+            { name: "Groq", limit: "~30M/mo per model", models: "Llama 3.3 70B, Qwen3", url: "https://console.groq.com", color: "green" },
+            { name: "Cerebras", limit: "~30M/mo shared", models: "Llama 3.1 8B, Qwen3", url: "https://cloud.cerebras.ai", color: "cyan" },
+            { name: "OpenRouter", limit: "~6M/mo per model", models: "19+ Free Models", url: "https://openrouter.ai", color: "light" },
+            { name: "SambaNova", limit: "~3M/mo shared", models: "DeepSeek V3.1, Llama 3.3", url: "https://cloud.sambanova.ai", color: "dark" },
+            { name: "Cloudflare Workers AI", limit: "~20M/mo shared", models: "Qwen3, Llama 4", url: "https://dash.cloudflare.com", color: "yellow" },
+            { name: "GitHub Models", limit: "~18M/mo est.", models: "GPT-4o, GPT-4.1", url: "https://github.com/marketplace/models", color: "cyan" },
+            { name: "Cohere", limit: "~1-2M/mo shared", models: "Command R+", url: "https://dashboard.cohere.com", color: "light" },
+          ].map((provider, i) => (
+            <NeoCard key={i} titleBar={provider.name} variant={provider.color as any} shadowSize="md" hoverExpand>
+              <div className="space-y-4 flex flex-col justify-between h-full p-2 text-black">
+                <div>
+                  <h4 className="font-display font-black text-2xl uppercase mb-1">{provider.limit}</h4>
+                  <p className="text-xs font-medium text-neutral-800">{provider.models}</p>
+                </div>
+                <a href={provider.url} target="_blank" rel="noopener noreferrer" className="block mt-4">
+                  <NeoButton variant="dark" size="sm" className="w-full flex items-center justify-center gap-2">
+                    Get API Key <ExternalLink className="w-3.5 h-3.5" />
+                  </NeoButton>
+                </a>
+              </div>
+            </NeoCard>
+          ))}
+        </div>
       </section>
 
       {/* CORE VALUE PILLARS SECTION */}

@@ -2,6 +2,9 @@
 apps/desktop/src-tauri/target/
 *.rs.bk
 Cargo.lock
+.antigravitycli
+.codex
+.agents
 
 # Node
 node_modules/
