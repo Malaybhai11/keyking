@@ -46,7 +46,10 @@ fn main() {
             commands::open_browser,
             commands::get_routing_rules,
             commands::save_routing_rules,
-            commands::get_available_models
+            commands::get_available_models,
+            commands::save_session,
+            commands::get_session,
+            commands::clear_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

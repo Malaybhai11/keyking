@@ -114,8 +114,9 @@ function Sidebar() {
         </NavLink>
         
         <div className="pt-4">
-          <button onClick={() => {
+          <button onClick={async () => {
               localStorage.removeItem('auth_session')
+              try { await invoke('clear_session') } catch (e) { console.error(e) }
               window.location.reload()
             }} 
             className="w-full flex items-center gap-3 px-4 py-3 border-3 border-transparent transition-all duration-200 text-neo-dark hover:bg-neo-pink hover:text-white hover:border-neo-dark hover:shadow-neo-sm cursor-pointer"
@@ -158,16 +159,26 @@ function App() {
     const unlisten = listen<{session_id: string, user_id: string}>('auth-success', (event) => {
       setSession(event.payload)
       localStorage.setItem('auth_session', JSON.stringify(event.payload))
+      invoke('save_session', { session: event.payload }).catch(console.error)
       if (posthog) {
-        posthog.identify(event.payload.user_id)
+        posthog.identify(event.payload.user_id, { email: event.payload.user_id })
       }
     })
     return () => { unlisten.then(fn => fn()) }
   }, [posthog])
 
   useEffect(() => {
+    invoke<{session_id: string, user_id: string} | null>('get_session').then(sess => {
+      if (sess) {
+        setSession(sess)
+        localStorage.setItem('auth_session', JSON.stringify(sess))
+      }
+    }).catch(console.error)
+  }, [])
+
+  useEffect(() => {
     if (session && posthog) {
-      posthog.identify(session.user_id)
+      posthog.identify(session.user_id, { email: session.user_id })
     }
   }, [session, posthog])
 

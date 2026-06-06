@@ -9,6 +9,12 @@ pub struct RoutingRule {
     pub model: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthSession {
+    pub session_id: String,
+    pub user_id: String,
+}
+
 pub struct VaultState {
     pub vault: Mutex<Vault>,
 }
@@ -287,4 +293,36 @@ pub fn open_browser(url: String) {
 
     #[cfg(target_os = "linux")]
     std::process::Command::new("xdg-open").arg(&url).spawn().ok();
+}
+
+#[tauri::command]
+pub async fn save_session(state: tauri::State<'_, SharedVault>, session: AuthSession) -> Result<(), String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("auth_session.json");
+    let content = serde_json::to_string(&session).map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_session(state: tauri::State<'_, SharedVault>) -> Result<Option<AuthSession>, String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("auth_session.json");
+    if path.exists() {
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let session: AuthSession = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        Ok(Some(session))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn clear_session(state: tauri::State<'_, SharedVault>) -> Result<(), String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("auth_session.json");
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
+    }
+    Ok(())
 }
