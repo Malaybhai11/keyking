@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "KEYKING NEO-BRUTALIST INSTALLER" -ForegroundColor Yellow -BackgroundColor Black
 Write-Host "===============================" -ForegroundColor Yellow -BackgroundColor Black
 
-$VERSION = "2.0.3"
+$VERSION = "2.1.0"
 $REPO = "Malaybhai11/keyking"
 $BIN_NAME = "keyking-desktop.exe"
 $ZIP_NAME = "keyking_windows_amd64.zip"
