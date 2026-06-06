@@ -504,13 +504,13 @@ console.log(response.choices[0].message.content);`
             { name: "Cohere", limit: "~1-2M/mo shared", models: "Command R+", url: "https://dashboard.cohere.com", color: "light" },
           ].map((provider, i) => (
             <NeoCard key={i} titleBar={provider.name} variant={provider.color as any} shadowSize="md" hoverExpand>
-              <div className="space-y-4 flex flex-col justify-between h-full p-2 text-black">
+              <div className="space-y-4 flex flex-col justify-between h-full p-2">
                 <div>
                   <h4 className="font-display font-black text-2xl uppercase mb-1">{provider.limit}</h4>
-                  <p className="text-xs font-medium text-neutral-800">{provider.models}</p>
+                  <p className="text-xs font-medium opacity-80">{provider.models}</p>
                 </div>
                 <a href={provider.url} target="_blank" rel="noopener noreferrer" className="block mt-4">
-                  <NeoButton variant="dark" size="sm" className="w-full flex items-center justify-center gap-2">
+                  <NeoButton variant={provider.color === "dark" ? "light" : "dark"} size="sm" className="w-full flex items-center justify-center gap-2">
                     Get API Key <ExternalLink className="w-3.5 h-3.5" />
                   </NeoButton>
                 </a>
