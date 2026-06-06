@@ -288,16 +288,16 @@ export default function KeysPage() {
                 </div>
 
                 {/* Sambanova */}
-                <div className="bg-neo-dark text-white border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
-                  <div className="bg-black text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                <div className="bg-[#111] text-white border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-black text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase border-b-2 border-neo-dark">
                     Sambanova
                     <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
                   </div>
                   <div className="p-6 flex-1 flex flex-col">
-                    <div className="bg-neo-cyan text-neo-dark px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~3M/mo shared</div>
-                    <div className="bg-neo-cyan/50 text-neo-cyan px-2 inline-block border border-neo-cyan font-bold text-sm mb-6 w-fit">DeepSeek V3.1, Llama 3.3</div>
+                    <div className="bg-neo-cyan text-neo-dark px-2 py-1 inline-block border-2 border-neo-cyan shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~3M/mo shared</div>
+                    <div className="text-neo-cyan px-2 inline-block font-bold text-sm mb-6 w-fit bg-neo-cyan/10 border border-neo-cyan">DeepSeek V3.1, Llama 3.3</div>
                     <div className="mt-auto">
-                      <a href="https://cloud.sambanova.ai/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-black text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                      <a href="https://cloud.sambanova.ai/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-white text-neo-dark py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-white transition-colors shadow-neo-sm">Get API Key ↗</a>
                     </div>
                   </div>
                 </div>
@@ -530,22 +530,22 @@ export async function POST(req: Request) {
           <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">API Keys</h2>
           <p className="text-neo-dark/80 font-bold text-sm">Manage and securely vault your provider API keys.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => setShowGuide(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
+            className="flex items-center gap-2 px-6 py-3 bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
             <BookOpen className="w-5 h-5" /> Free Tier Guide
           </button>
           <button
             onClick={() => { setShowExport(true); setExportResult(''); setExportPassphrase(''); setExportError(''); }}
-            className="flex items-center gap-2 px-6 py-3 bg-neo-purple text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
+            className="flex items-center gap-2 px-6 py-3 bg-neo-purple text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
             <Shield className="w-5 h-5" /> Deploy to Serverless
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-2 px-6 py-3 bg-neo-orange text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
+            className="flex items-center gap-2 px-6 py-3 bg-neo-orange text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
             {showAdd ? 'Cancel' : <><Plus className="w-5 h-5" /> Add New Key</>}
           </button>
@@ -553,7 +553,7 @@ export async function POST(req: Request) {
       </div>
 
       {showAdd && (
-        <div className="bg-neo-cyan border-3 border-neo-dark shadow-neo-md p-6 relative overflow-hidden">
+        <div className="bg-neo-cyan border-3 border-neo-dark shadow-neo-md p-6 relative">
           
           <h3 className="font-black font-display text-xl text-neo-dark mb-5 flex items-center gap-2 uppercase">
             <KeySquare className="w-6 h-6 text-neo-dark" />

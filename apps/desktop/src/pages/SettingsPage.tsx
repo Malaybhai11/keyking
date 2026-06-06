@@ -24,9 +24,14 @@ export default function SettingsPage() {
           </div>
         </div>
         {tier === 'free' && (
-          <button className="mt-6 w-full py-4 bg-neo-pink text-white border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all shadow-neo-sm cursor-pointer">
-            Upgrade to Ultra — $2/month
-          </button>
+          <div className="mt-6 flex flex-col gap-3">
+            <button className="w-full py-4 bg-neo-pink text-neo-dark border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all shadow-neo-sm cursor-pointer">
+              Upgrade to Ultra — $2/month
+            </button>
+            <p className="text-neo-dark font-bold text-sm text-center tracking-wide">
+              🔥 ULTRA ACCOUNT AVAILABLE FOR A LIMITED TIME! WE ARE SO CLOSE TO LAUNCH! 🔥
+            </p>
+          </div>
         )}
       </div>
       
