@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { ShieldAlert, GripVertical, Save, Check } from 'lucide-react'
+import { ShieldAlert, GripVertical, Save, Check, Plus, Trash2, X } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -29,7 +29,7 @@ interface ModelInfo {
   provider: string
 }
 
-function SortableRuleItem({ rule, index }: { rule: RoutingRule, index: number }) {
+function SortableRuleItem({ rule, index, onRemove }: { rule: RoutingRule, index: number, onRemove: () => void }) {
   const {
     attributes,
     listeners,
@@ -64,8 +64,13 @@ function SortableRuleItem({ rule, index }: { rule: RoutingRule, index: number })
             {rule.model}
           </div>
         </div>
-        <div className="px-3 py-1 bg-neo-yellow border-2 border-neo-dark text-xs font-black uppercase text-neo-dark">
-          {rule.provider}
+        <div className="flex items-center gap-3">
+          <div className="px-3 py-1 bg-neo-yellow border-2 border-neo-dark text-xs font-black uppercase text-neo-dark">
+            {rule.provider}
+          </div>
+          <button onClick={onRemove} className="p-1.5 hover:bg-neo-pink hover:text-white border-2 border-transparent hover:border-neo-dark transition-all text-neo-dark/50">
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
@@ -74,6 +79,8 @@ function SortableRuleItem({ rule, index }: { rule: RoutingRule, index: number })
 
 export default function RoutingRulesPage() {
   const [rules, setRules] = useState<RoutingRule[]>([])
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
+  const [showAddModal, setShowAddModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -92,12 +99,11 @@ export default function RoutingRulesPage() {
     try {
       const savedRules = await invoke<RoutingRule[]>('get_routing_rules')
       const models = await invoke<ModelInfo[]>('get_available_models')
+      
+      setAvailableModels(models)
 
       if (savedRules.length > 0) {
         setRules(savedRules)
-      } else {
-        const defaultRules = models.map((m) => ({ provider: m.provider, model: m.id }))
-        setRules(defaultRules)
       }
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -138,14 +144,22 @@ export default function RoutingRulesPage() {
           <h1 className="text-3xl font-black font-display uppercase tracking-tight text-neo-dark mb-2">Priority Routing</h1>
           <p className="text-neo-dark/70 font-medium">Drag and drop models to set global fallback order.</p>
         </div>
-        <button
-          onClick={saveRules}
-          disabled={isSaving}
-          className="flex items-center gap-2 bg-neo-green text-neo-dark px-6 py-3 border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all disabled:opacity-50"
-        >
-          {saved ? <Check className="w-5 h-5" /> : <Save className="w-5 h-5" />}
-          {saved ? 'Saved' : 'Save Rules'}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-neo-yellow text-neo-dark px-4 py-3 border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all cursor-pointer"
+          >
+            <Plus className="w-5 h-5" /> Add Model
+          </button>
+          <button
+            onClick={saveRules}
+            disabled={isSaving}
+            className="flex items-center gap-2 bg-neo-green text-neo-dark px-6 py-3 border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {saved ? <Check className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+            {saved ? 'Saved' : 'Save Rules'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-neo-blue/10 border-3 border-neo-blue p-5 mb-8 flex gap-4">
@@ -170,17 +184,66 @@ export default function RoutingRulesPage() {
             strategy={verticalListSortingStrategy}
           >
             {rules.map((rule, index) => (
-              <SortableRuleItem key={rule.model} rule={rule} index={index} />
+              <SortableRuleItem 
+                key={rule.model} 
+                rule={rule} 
+                index={index} 
+                onRemove={() => {
+                  setRules(rules.filter(r => r.model !== rule.model))
+                  setSaved(false)
+                }} 
+              />
             ))}
           </SortableContext>
         </DndContext>
 
         {rules.length === 0 && (
           <div className="text-center py-12 text-neo-dark/50 font-black uppercase border-3 border-dashed border-neo-dark/20">
-            No models available. Add API keys to see models.
+            No active routing rules. Click "Add Model" to setup priority.
           </div>
         )}
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-neo-dark/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white border-4 border-neo-dark shadow-neo-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b-3 border-neo-dark bg-neo-yellow">
+              <h2 className="font-display font-black uppercase text-xl">Select Models</h2>
+              <button onClick={() => setShowAddModal(false)} className="hover:bg-neo-pink p-1 border-2 border-transparent hover:border-neo-dark transition-all cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1 space-y-2">
+              {availableModels.length === 0 && (
+                <div className="text-center py-6 text-neo-dark/50 font-black uppercase">
+                  Add API keys first to see models.
+                </div>
+              )}
+              {availableModels.map(m => {
+                const isAdded = rules.some(r => r.model === m.id)
+                return (
+                  <div key={m.id} className="flex items-center justify-between p-3 border-2 border-neo-dark bg-neo-bg">
+                    <div>
+                      <div className="font-bold">{m.id}</div>
+                      <div className="text-xs text-neo-dark/70 uppercase">{m.provider}</div>
+                    </div>
+                    <button
+                      disabled={isAdded}
+                      onClick={() => {
+                        setRules([...rules, { provider: m.provider, model: m.id }])
+                        setSaved(false)
+                      }}
+                      className="px-3 py-1 bg-neo-green border-2 border-neo-dark text-xs font-black uppercase disabled:opacity-50 disabled:bg-neo-bg cursor-pointer"
+                    >
+                      {isAdded ? 'Added' : 'Add'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -132,6 +132,16 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
         models.push(ModelInfo { id: "deepseek-chat".into(), provider: "DeepSeek".into() });
         models.push(ModelInfo { id: "deepseek-coder".into(), provider: "DeepSeek".into() });
     }
+    if providers.contains("OpenRouter") {
+        models.push(ModelInfo { id: "meta-llama/llama-3.1-8b-instruct:free".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "meta-llama/llama-3.1-70b-instruct:free".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "mistralai/mixtral-8x7b-instruct:free".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "google/gemini-pro-1.5".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "google/gemini-flash-1.5".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "openai/gpt-4o".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "anthropic/claude-3.5-sonnet".into(), provider: "OpenRouter".into() });
+        models.push(ModelInfo { id: "deepseek/deepseek-chat".into(), provider: "OpenRouter".into() });
+    }
     
     Ok(models)
 }
