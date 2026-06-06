@@ -72,6 +72,10 @@ fn provider_url(provider: &str) -> &'static str {
         "DeepSeek" => "https://api.deepseek.com/v1",
         "OpenRouter" => "https://openrouter.ai/api/v1",
         "Cohere" => "https://api.cohere.ai/v1",
+        "Cerebras" => "https://api.cerebras.ai/v1",
+        "Sambanova" => "https://api.sambanova.ai/v1",
+        "Github" => "https://models.inference.ai.azure.com",
+        "Cloudflare" => "https://api.cloudflare.com/client/v4/accounts/default/ai/v1",
         _ => "https://api.openai.com/v1/chat/completions",
     }
 }
@@ -435,7 +439,7 @@ impl ProxyRouter {
             }
 
             // Fallback: try all other providers that have keys
-            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere"];
+            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github"];
             for &provider in &all_providers {
                 if provider == primary_provider {
                     continue;

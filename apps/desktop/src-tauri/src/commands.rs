@@ -126,6 +126,36 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             continue;
         }
 
+        if provider == "Cerebras" {
+            all_models.push(ModelInfo { id: "llama3.1-8b".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "llama-3.3-70b".into(), provider: provider.clone() });
+            continue;
+        }
+
+        if provider == "Sambanova" {
+            all_models.push(ModelInfo { id: "Meta-Llama-3.1-8B-Instruct".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "Meta-Llama-3.1-70B-Instruct".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "Meta-Llama-3.3-70B-Instruct".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "Qwen2.5-72B-Instruct".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "DeepSeek-R1-Distill-Llama-70B".into(), provider: provider.clone() });
+            continue;
+        }
+
+        if provider == "Cloudflare" {
+            all_models.push(ModelInfo { id: "@cf/meta/llama-3.1-8b-instruct".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "@cf/qwen/qwen1.5-14b-chat-awq".into(), provider: provider.clone() });
+            continue;
+        }
+
+        if provider == "Github" {
+            all_models.push(ModelInfo { id: "gpt-4o".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "gpt-4o-mini".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "Phi-3.5-mini-instruct".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "Llama-3.3-70B-Instruct".into(), provider: provider.clone() });
+            continue;
+        }
+
         let url = match provider.as_str() {
             "OpenAI" => Some("https://api.openai.com/v1/models"),
             "Groq" => Some("https://api.groq.com/openai/v1/models"),
