@@ -83,6 +83,14 @@ export default function RoutingRulesPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [modelSearch, setModelSearch] = useState('')
+
+  const filteredModels = modelSearch
+    ? availableModels.filter(m => 
+        m.id.toLowerCase().includes(modelSearch.toLowerCase()) || 
+        m.provider.toLowerCase().includes(modelSearch.toLowerCase())
+      )
+    : availableModels
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -213,13 +221,27 @@ export default function RoutingRulesPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="p-4 border-b-3 border-neo-dark bg-neo-bg">
+              <input
+                type="text"
+                placeholder="Search models or providers..."
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                className="w-full bg-white border-2 border-neo-dark px-3 py-2 text-neo-dark font-bold placeholder:text-neo-dark/50 focus:outline-none focus:bg-neo-yellow transition-all"
+              />
+            </div>
             <div className="p-4 overflow-y-auto flex-1 space-y-2">
+              {filteredModels.length === 0 && availableModels.length > 0 && (
+                <div className="text-center py-6 text-neo-dark/50 font-black uppercase">
+                  No models found matching "{modelSearch}".
+                </div>
+              )}
               {availableModels.length === 0 && (
                 <div className="text-center py-6 text-neo-dark/50 font-black uppercase">
                   Add API keys first to see models.
                 </div>
               )}
-              {availableModels.map(m => {
+              {filteredModels.map(m => {
                 const isAdded = rules.some(r => r.model === m.id)
                 return (
                   <div key={m.id} className="flex items-center justify-between p-3 border-2 border-neo-dark bg-neo-bg">
