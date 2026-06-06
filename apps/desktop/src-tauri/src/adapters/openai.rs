@@ -30,8 +30,14 @@ impl OpenAIAdapter {
             return Err(AdapterError::ApiError { status, message: msg });
         }
 
-        let resp = response.json::<NormalizedResponse>().await
-            .map_err(|e| AdapterError::ParseError(e.to_string()))?;
+        let body = response.text().await.unwrap_or_default();
+        let resp = match serde_json::from_str::<NormalizedResponse>(&body) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("Parse error from adapter: {}. Raw body: {}", e, body);
+                return Err(AdapterError::ParseError(e.to_string()));
+            }
+        };
         Ok(resp)
     }
 }
