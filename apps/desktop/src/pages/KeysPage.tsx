@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Eye, EyeOff, Shield, CheckCircle, Loader, KeySquare, Copy, Check, X, Lock } from 'lucide-react'
+import { Plus, Trash2, Eye, EyeOff, Shield, CheckCircle, Loader, KeySquare, Copy, Check, X, Lock, BookOpen, ChevronDown } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
 interface KeyEntry {
@@ -29,6 +29,8 @@ export default function KeysPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const providers = ['OpenAI', 'Groq', 'Gemini', 'Mistral', 'Anthropic', 'xAI', 'DeepSeek', 'OpenRouter', 'Cohere']
 
@@ -188,6 +190,164 @@ export default function KeysPage() {
                 className="h-full bg-neo-pink border-r-3 border-neo-dark transition-all duration-700 ease-out" 
                 style={{ width: `${(encryptingStep / 4) * 100}%` }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Free Tier Guide Modal */}
+      {showGuide && (
+        <div className="fixed inset-0 bg-neo-dark/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-neo-bg border-4 border-neo-dark p-0 w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-neo-xl relative flex flex-col">
+            <div className="sticky top-0 bg-neo-yellow border-b-4 border-neo-dark px-6 py-4 flex items-center justify-between z-10 shadow-sm">
+              <h3 className="font-display font-black text-neo-dark text-xl md:text-2xl uppercase tracking-wider flex items-center gap-2"><BookOpen className="w-6 h-6" /> The Free Tier Catalog</h3>
+              <button onClick={() => setShowGuide(false)} className="p-1 hover:bg-white/50 transition-colors cursor-pointer">
+                <X className="w-6 h-6 text-neo-dark" />
+              </button>
+            </div>
+            <div className="p-6 md:p-8 space-y-6 bg-[#f4f4f0]">
+              <p className="text-lg font-bold text-neo-dark leading-relaxed max-w-3xl border-3 border-neo-dark bg-white p-4 shadow-neo-sm">
+                Over 100+ free models across 16 providers. Mistral alone contributes ~1B; everything else is bonus. Get your keys below, drop them in KeyKing, and never pay for tokens again.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* Mistral */}
+                <div className="bg-white border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Mistral La Plateforme
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~1B/mo shared</div>
+                    <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Mistral Large/Medium, Codestral</div>
+                    <div className="mt-auto">
+                      <a href="https://console.mistral.ai/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Google Gemini */}
+                <div className="bg-neo-yellow border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Google Gemini
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col bg-neo-yellow">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~3M/mo per model</div>
+                    <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Gemini 2.5 Flash, Flash-Lite</div>
+                    <div className="mt-auto">
+                      <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Groq */}
+                <div className="bg-neo-green border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Groq
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col bg-neo-green">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~30M/mo per model</div>
+                    <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Llama 3.3 70B, Qwen3</div>
+                    <div className="mt-auto">
+                      <a href="https://console.groq.com/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cerebras */}
+                <div className="bg-neo-cyan border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Cerebras
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col bg-neo-cyan">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~30M/mo shared</div>
+                    <div className="bg-white/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Llama 3.1 8B, Qwen3</div>
+                    <div className="mt-auto">
+                      <a href="https://cloud.cerebras.ai/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* OpenRouter */}
+                <div className="bg-white border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    OpenRouter
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~6M/mo per model</div>
+                    <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">19+ Free Models</div>
+                    <div className="mt-auto">
+                      <a href="https://openrouter.ai/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sambanova */}
+                <div className="bg-neo-dark text-white border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-black text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Sambanova
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="bg-neo-cyan text-neo-dark px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~3M/mo shared</div>
+                    <div className="bg-neo-cyan/50 text-neo-cyan px-2 inline-block border border-neo-cyan font-bold text-sm mb-6 w-fit">DeepSeek V3.1, Llama 3.3</div>
+                    <div className="mt-auto">
+                      <a href="https://cloud.sambanova.ai/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-black text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cloudflare Workers AI */}
+                <div className="bg-neo-yellow border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Cloudflare Workers AI
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col bg-neo-yellow">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~20M/mo shared</div>
+                    <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Qwen3, Llama 4</div>
+                    <div className="mt-auto">
+                      <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Github Models */}
+                <div className="bg-neo-cyan border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Github Models
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col bg-neo-cyan">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~18M/mo est.</div>
+                    <div className="bg-white/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">GPT-4o, GPT-4.1</div>
+                    <div className="mt-auto">
+                      <a href="https://github.com/marketplace/models" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cohere */}
+                <div className="bg-white border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Cohere
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">~1-2M/mo shared</div>
+                    <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Command R+</div>
+                    <div className="mt-auto">
+                      <a href="https://dashboard.cohere.com/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
         </div>
@@ -372,6 +532,12 @@ export async function POST(req: Request) {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowGuide(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
+          >
+            <BookOpen className="w-5 h-5" /> Free Tier Guide
+          </button>
+          <button
             onClick={() => { setShowExport(true); setExportResult(''); setExportPassphrase(''); setExportError(''); }}
             className="flex items-center gap-2 px-6 py-3 bg-neo-purple text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase cursor-pointer"
           >
@@ -395,15 +561,33 @@ export async function POST(req: Request) {
           </h3>
           
           <div className="flex flex-col md:flex-row gap-4 relative z-10">
-            <div className="w-full md:w-48">
+            <div className="w-full md:w-48 relative">
               <label className="block text-xs font-bold font-display text-neo-dark uppercase tracking-wider mb-2">Provider</label>
-              <select
-                value={newProvider}
-                onChange={(e) => setNewProvider(e.target.value)}
-                className="w-full bg-white border-3 border-neo-dark p-3 text-neo-dark font-bold appearance-none focus:outline-none focus:bg-neo-yellow transition-all shadow-neo-sm"
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full bg-white border-3 border-neo-dark p-3 text-neo-dark font-bold text-left focus:outline-none focus:bg-neo-yellow transition-all shadow-neo-sm flex justify-between items-center"
               >
-                {providers.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+                {newProvider}
+                <div className="border-l-2 border-neo-dark pl-2 ml-2">
+                  <ChevronDown className="w-4 h-4 text-neo-dark" />
+                </div>
+              </button>
+              {isDropdownOpen && (
+                <div className="absolute top-full mt-2 left-0 w-full bg-white border-3 border-neo-dark shadow-neo-md z-50 max-h-48 overflow-y-auto">
+                  {providers.map(p => (
+                    <div
+                      key={p}
+                      onClick={() => {
+                        setNewProvider(p);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full text-left p-3 border-b-2 border-neo-dark last:border-b-0 hover:bg-neo-yellow font-bold text-neo-dark transition-colors cursor-pointer"
+                    >
+                      {p}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             <div className="flex-1">
