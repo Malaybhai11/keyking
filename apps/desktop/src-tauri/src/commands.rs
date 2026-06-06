@@ -86,64 +86,95 @@ pub struct ModelInfo {
     provider: String,
 }
 
+#[derive(serde::Deserialize)]
+struct OpenAiModel {
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct OpenAiModelsResponse {
+    data: Vec<OpenAiModel>,
+}
+
 #[tauri::command]
 pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Result<Vec<ModelInfo>, String> {
-    // For now, return a static robust list based on configured providers.
-    // Dynamic fetching can be added here by making HTTP requests to each key.
-    let vault = state.vault.lock().await;
+    let mut vault = state.vault.lock().await;
     let keys = vault.list_keys();
-    let mut providers: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for k in keys {
-        providers.insert(k.provider);
+    let mut provider_keys: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    
+    for k in &keys {
+        if let Some(Ok(pk)) = vault.get_decrypted_key(&k.provider) {
+            provider_keys.insert(k.provider.clone(), pk);
+        }
+    }
+    // Drop the lock before making HTTP requests!
+    drop(vault);
+    
+    let mut all_models = Vec::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut futures = Vec::new();
+
+    for (provider, key) in provider_keys {
+        if provider == "Anthropic" {
+            all_models.push(ModelInfo { id: "claude-3-5-sonnet-latest".into(), provider: "Anthropic".into() });
+            all_models.push(ModelInfo { id: "claude-3-5-haiku-latest".into(), provider: "Anthropic".into() });
+            all_models.push(ModelInfo { id: "claude-3-opus-latest".into(), provider: "Anthropic".into() });
+            continue;
+        }
+
+        let url = match provider.as_str() {
+            "OpenAI" => Some("https://api.openai.com/v1/models"),
+            "Groq" => Some("https://api.groq.com/openai/v1/models"),
+            "OpenRouter" => Some("https://openrouter.ai/api/v1/models"),
+            "Gemini" => Some("https://generativelanguage.googleapis.com/v1beta/openai/models"),
+            "Mistral" => Some("https://api.mistral.ai/v1/models"),
+            "xAI" => Some("https://api.x.ai/v1/models"),
+            "DeepSeek" => Some("https://api.deepseek.com/models"),
+            _ => None,
+        };
+
+        if let Some(u) = url {
+            let client_clone = client.clone();
+            let p_clone = provider.clone();
+            let k_clone = key.clone();
+            let fut = async move {
+                let mut req = client_clone.get(u).header("Authorization", format!("Bearer {}", k_clone));
+                if p_clone == "OpenRouter" {
+                    req = req.header("HTTP-Referer", "https://keyking.ledgion.in")
+                             .header("X-Title", "KeyKing");
+                }
+                let mut results = Vec::new();
+                if let Ok(resp) = req.send().await {
+                    if resp.status().is_success() {
+                        if let Ok(data) = resp.json::<OpenAiModelsResponse>().await {
+                            for m in data.data {
+                                results.push(ModelInfo {
+                                    id: m.id,
+                                    provider: p_clone.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+                results
+            };
+            futures.push(fut);
+        }
     }
     
-    let mut models = Vec::new();
-    if providers.contains("OpenAI") {
-        models.push(ModelInfo { id: "gpt-4o".into(), provider: "OpenAI".into() });
-        models.push(ModelInfo { id: "gpt-4-turbo".into(), provider: "OpenAI".into() });
-        models.push(ModelInfo { id: "gpt-3.5-turbo".into(), provider: "OpenAI".into() });
-        models.push(ModelInfo { id: "o1-preview".into(), provider: "OpenAI".into() });
-        models.push(ModelInfo { id: "o1-mini".into(), provider: "OpenAI".into() });
-    }
-    if providers.contains("Anthropic") {
-        models.push(ModelInfo { id: "claude-3-5-sonnet-20240620".into(), provider: "Anthropic".into() });
-        models.push(ModelInfo { id: "claude-3-opus-20240229".into(), provider: "Anthropic".into() });
-        models.push(ModelInfo { id: "claude-3-haiku-20240307".into(), provider: "Anthropic".into() });
-    }
-    if providers.contains("Groq") {
-        models.push(ModelInfo { id: "llama-3.3-70b-versatile".into(), provider: "Groq".into() });
-        models.push(ModelInfo { id: "llama-3.1-8b-instant".into(), provider: "Groq".into() });
-        models.push(ModelInfo { id: "mixtral-8x7b-32768".into(), provider: "Groq".into() });
-        models.push(ModelInfo { id: "gemma2-9b-it".into(), provider: "Groq".into() });
-    }
-    if providers.contains("Gemini") {
-        models.push(ModelInfo { id: "gemini-1.5-pro".into(), provider: "Gemini".into() });
-        models.push(ModelInfo { id: "gemini-1.5-flash".into(), provider: "Gemini".into() });
-    }
-    if providers.contains("Mistral") {
-        models.push(ModelInfo { id: "mistral-large-latest".into(), provider: "Mistral".into() });
-        models.push(ModelInfo { id: "mistral-medium-latest".into(), provider: "Mistral".into() });
-    }
-    if providers.contains("xAI") {
-        models.push(ModelInfo { id: "grok-beta".into(), provider: "xAI".into() });
-        models.push(ModelInfo { id: "grok-2-latest".into(), provider: "xAI".into() });
-    }
-    if providers.contains("DeepSeek") {
-        models.push(ModelInfo { id: "deepseek-chat".into(), provider: "DeepSeek".into() });
-        models.push(ModelInfo { id: "deepseek-coder".into(), provider: "DeepSeek".into() });
-    }
-    if providers.contains("OpenRouter") {
-        models.push(ModelInfo { id: "meta-llama/llama-3.1-8b-instruct:free".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "meta-llama/llama-3.1-70b-instruct:free".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "mistralai/mixtral-8x7b-instruct:free".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "google/gemini-pro-1.5".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "google/gemini-flash-1.5".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "openai/gpt-4o".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "anthropic/claude-3.5-sonnet".into(), provider: "OpenRouter".into() });
-        models.push(ModelInfo { id: "deepseek/deepseek-chat".into(), provider: "OpenRouter".into() });
+    let results = futures::future::join_all(futures).await;
+    for mut res in results {
+        all_models.append(&mut res);
     }
     
-    Ok(models)
+    all_models.sort_by(|a, b| a.id.cmp(&b.id));
+    all_models.dedup_by(|a, b| a.id == b.id && a.provider == b.provider);
+
+    Ok(all_models)
 }
 
 #[tauri::command]
