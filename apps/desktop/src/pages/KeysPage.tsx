@@ -530,24 +530,24 @@ export async function POST(req: Request) {
           <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">API Keys</h2>
           <p className="text-neo-dark/80 font-bold text-sm">Manage and securely vault your provider API keys.</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-4 flex-wrap justify-end">
           <button
             onClick={() => setShowGuide(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
-            <BookOpen className="w-5 h-5" /> Free Tier Guide
+            <BookOpen className="w-4 h-4" /> Free Tier Guide
           </button>
           <button
             onClick={() => { setShowExport(true); setExportResult(''); setExportPassphrase(''); setExportError(''); }}
-            className="flex items-center gap-2 px-6 py-3 bg-neo-purple text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm bg-neo-purple text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
-            <Shield className="w-5 h-5" /> Deploy to Serverless
+            <Shield className="w-4 h-4" /> Deploy to Serverless
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-2 px-6 py-3 bg-neo-orange text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm bg-neo-orange text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
-            {showAdd ? 'Cancel' : <><Plus className="w-5 h-5" /> Add New Key</>}
+            {showAdd ? 'Cancel' : <><Plus className="w-4 h-4 shrink-0" /> Add New Key</>}
           </button>
         </div>
       </div>
