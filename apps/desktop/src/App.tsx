@@ -10,6 +10,8 @@ import SettingsPage from './pages/SettingsPage'
 import AnomaliesPage from './pages/AnomaliesPage'
 import RoutingRulesPage from './pages/RoutingRulesPage'
 import { usePostHog } from 'posthog-js/react'
+import { TourProvider } from './contexts/TourContext'
+import TourOverlay from './components/TourOverlay'
 
 export interface RoutingEvent {
   id: string
@@ -83,22 +85,22 @@ function Sidebar() {
       </div>
       
       <nav className="flex-1 px-4 py-6 space-y-3 font-display uppercase font-bold text-sm">
-        <NavLink to="/" className={({isActive}) =>
+        <NavLink to="/" data-tour="tour-step-0" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <LayoutDashboard className="w-5 h-5" /> Dashboard
         </NavLink>
-        <NavLink to="/keys" className={({isActive}) =>
+        <NavLink to="/keys" data-tour="tour-step-1" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <Key className="w-5 h-5" /> API Keys
         </NavLink>
-        <NavLink to="/routing-log" className={({isActive}) =>
+        <NavLink to="/routing-log" data-tour="tour-step-7" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <Activity className="w-5 h-5" /> Routing Log
         </NavLink>
-        <NavLink to="/priority" className={({isActive}) =>
+        <NavLink to="/priority" data-tour="tour-step-5" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <GripVertical className="w-5 h-5" /> Priority
@@ -207,21 +209,24 @@ function App() {
 
   return (
     <EventProvider>
-      <div className="flex h-screen bg-neo-bg text-neo-dark font-body selection:bg-neo-yellow selection:text-neo-dark">
-        <Sidebar />
-        <main className="flex-1 p-8 overflow-auto relative">
-          <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/keys" element={<KeysPage />} />
-              <Route path="/routing-log" element={<RoutingLogPage />} />
-              <Route path="/priority" element={<RoutingRulesPage />} />
-              <Route path="/anomalies" element={<AnomaliesPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
-          </div>
-        </main>
-      </div>
+      <TourProvider>
+        <div className="flex h-screen bg-neo-bg text-neo-dark font-body selection:bg-neo-yellow selection:text-neo-dark">
+          <Sidebar />
+          <main className="flex-1 p-8 overflow-auto relative">
+            <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/keys" element={<KeysPage />} />
+                <Route path="/routing-log" element={<RoutingLogPage />} />
+                <Route path="/priority" element={<RoutingRulesPage />} />
+                <Route path="/anomalies" element={<AnomaliesPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </div>
+          </main>
+          <TourOverlay />
+        </div>
+      </TourProvider>
     </EventProvider>
   )
 }

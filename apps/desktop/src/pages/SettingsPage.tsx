@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Crown, Zap } from 'lucide-react'
+import { Crown } from 'lucide-react'
 
 export default function SettingsPage() {
-  const [tier] = useState<'free' | 'ultra'>('free')
+
   const [port, setPort] = useState(8787)
 
   return (

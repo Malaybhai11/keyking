@@ -533,18 +533,21 @@ export async function POST(req: Request) {
         <div className="flex items-center gap-4 flex-wrap justify-end">
           <button
             onClick={() => setShowGuide(true)}
+            data-tour="tour-step-3"
             className="flex items-center gap-2 px-4 py-2.5 text-sm bg-neo-cyan text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
             <BookOpen className="w-4 h-4" /> Free Tier Guide
           </button>
           <button
             onClick={() => { setShowExport(true); setExportResult(''); setExportPassphrase(''); setExportError(''); }}
+            data-tour="tour-step-4"
             className="flex items-center gap-2 px-4 py-2.5 text-sm bg-neo-purple text-white border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
             <Shield className="w-4 h-4" /> Deploy to Serverless
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
+            data-tour="tour-step-2"
             className="flex items-center gap-2 px-4 py-2.5 text-sm bg-neo-orange text-neo-dark border-3 border-neo-dark shadow-neo-sm hover:-translate-y-1 transition-all font-display font-black uppercase whitespace-nowrap cursor-pointer"
           >
             {showAdd ? 'Cancel' : <><Plus className="w-4 h-4 shrink-0" /> Add New Key</>}

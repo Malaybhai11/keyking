@@ -181,7 +181,7 @@ export default function RoutingRulesPage() {
         </div>
       </div>
 
-      <div className="bg-white border-3 border-neo-dark p-6">
+      <div className="bg-white border-3 border-neo-dark p-6" data-tour="tour-step-6">
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
