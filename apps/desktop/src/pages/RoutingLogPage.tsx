@@ -1,17 +1,18 @@
-import React, { useState } from 'react'
-import { Filter, Trash2, Activity, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { Filter, Trash2, Activity, Clock, X, Info } from 'lucide-react'
 import { useEvents } from '../App'
 
 export default function RoutingLogPage() {
   const { events, clearEvents } = useEvents()
   const [filter, setFilter] = useState('')
+  const [selectedError, setSelectedError] = useState<string | null>(null)
 
   const filtered = filter
     ? events.filter(e => e.provider.toLowerCase().includes(filter.toLowerCase()))
     : events
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 relative">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-4xl font-black font-display tracking-tight text-neo-dark mb-2 uppercase">Routing Log</h2>
@@ -68,33 +69,42 @@ export default function RoutingLogPage() {
               </tr>
             )}
             {filtered.map(event => (
-              <React.Fragment key={event.id}>
-                <tr className="hover:bg-neo-bg transition-colors">
-                  <td className="py-4 px-6">
-                    <span className="font-mono text-sm font-bold text-neo-dark">
-                      {new Date(event.timestamp * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className="px-3 py-1.5 bg-white border-2 border-neo-dark shadow-neo-sm text-sm font-black font-display uppercase text-neo-dark">
-                      {event.provider}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 rounded-none w-16 bg-white border-2 border-neo-dark shadow-neo-sm overflow-hidden">
-                        <div 
-                          className={`h-full ${event.latency_ms < 500 ? 'bg-neo-green border-r-2 border-neo-dark' : event.latency_ms < 1500 ? 'bg-neo-yellow border-r-2 border-neo-dark' : 'bg-neo-pink border-r-2 border-neo-dark'}`} 
-                          style={{ width: `${Math.min(100, (event.latency_ms / 2000) * 100)}%` }} 
-                        />
-                      </div>
-                      <span className="font-mono font-bold text-sm text-neo-dark">{event.latency_ms}ms</span>
+              <tr key={event.id} className="hover:bg-neo-bg transition-colors">
+                <td className="py-4 px-6">
+                  <span className="font-mono text-sm font-bold text-neo-dark">
+                    {new Date(event.timestamp * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <span className="px-3 py-1.5 bg-white border-2 border-neo-dark shadow-neo-sm text-sm font-black font-display uppercase text-neo-dark">
+                    {event.provider}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <div className="flex items-center gap-3">
+                    <div className="h-3 rounded-none w-16 bg-white border-2 border-neo-dark shadow-neo-sm overflow-hidden">
+                      <div 
+                        className={`h-full ${event.latency_ms < 500 ? 'bg-neo-green border-r-2 border-neo-dark' : event.latency_ms < 1500 ? 'bg-neo-yellow border-r-2 border-neo-dark' : 'bg-neo-pink border-r-2 border-neo-dark'}`} 
+                        style={{ width: `${Math.min(100, (event.latency_ms / 2000) * 100)}%` }} 
+                      />
                     </div>
-                  </td>
-                  <td className="py-4 px-6 text-neo-dark font-black text-lg">
-                    {event.tokens_used.toLocaleString()}
-                  </td>
-                  <td className="py-4 px-6 text-right">
+                    <span className="font-mono font-bold text-sm text-neo-dark">{event.latency_ms}ms</span>
+                  </div>
+                </td>
+                <td className="py-4 px-6 text-neo-dark font-black text-lg">
+                  {event.tokens_used.toLocaleString()}
+                </td>
+                <td className="py-4 px-6 text-right">
+                  <div className="flex items-center justify-end gap-3">
+                    {event.error_msg && !event.success && (
+                      <button
+                        onClick={() => setSelectedError(event.error_msg!)}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-neo-pink/10 border-2 border-neo-dark shadow-[2px_2px_0px_0px_rgba(33,37,41,1)] transition-all font-display font-black uppercase text-[10px] text-neo-dark cursor-pointer"
+                      >
+                        <Info className="w-3 h-3" />
+                        Details
+                      </button>
+                    )}
                     <span className={`inline-flex items-center justify-center px-3 py-1 font-display uppercase text-xs font-black border-2 border-neo-dark shadow-neo-sm ${
                       event.success 
                         ? 'bg-neo-green text-neo-dark' 
@@ -102,20 +112,44 @@ export default function RoutingLogPage() {
                     }`}>
                       {event.success ? 'Success' : 'Failed'}
                     </span>
-                  </td>
-                </tr>
-                {event.error_msg && (
-                  <tr className="bg-neo-pink/10">
-                    <td colSpan={5} className="py-3 px-6 text-neo-pink font-bold font-mono text-sm break-all">
-                      ⚠️ ERROR: {event.error_msg}
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
+                  </div>
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {selectedError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neo-dark/50 backdrop-blur-sm">
+          <div className="bg-white border-4 border-neo-dark shadow-neo-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="bg-neo-pink border-b-4 border-neo-dark px-6 py-4 flex items-center justify-between">
+              <h3 className="font-display font-black text-white text-xl uppercase tracking-wider">Error Details</h3>
+              <button 
+                onClick={() => setSelectedError(null)}
+                className="p-1 hover:bg-white/20 transition-colors"
+              >
+                <X className="w-6 h-6 text-white" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto bg-neo-bg">
+              <div className="bg-white border-3 border-neo-dark shadow-[4px_4px_0px_0px_rgba(33,37,41,1)] p-4">
+                <pre className="whitespace-pre-wrap font-mono text-sm font-bold text-neo-dark break-all leading-relaxed">
+                  {selectedError}
+                </pre>
+              </div>
+            </div>
+            <div className="p-4 border-t-4 border-neo-dark bg-white flex justify-end">
+              <button
+                onClick={() => setSelectedError(null)}
+                className="px-6 py-2 bg-neo-yellow border-3 border-neo-dark shadow-[4px_4px_0px_0px_rgba(33,37,41,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all font-display font-black uppercase text-sm text-neo-dark"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
