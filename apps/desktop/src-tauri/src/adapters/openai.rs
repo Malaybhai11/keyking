@@ -17,6 +17,8 @@ impl OpenAIAdapter {
             .post(url)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
+            .header("HTTP-Referer", "https://keyking.ledgion.in")
+            .header("X-Title", "KeyKing")
             .json(req)
             .send()
             .await
