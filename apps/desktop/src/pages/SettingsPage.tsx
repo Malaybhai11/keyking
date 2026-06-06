@@ -16,23 +16,19 @@ export default function SettingsPage() {
         <h3 className="text-2xl font-black font-display uppercase mb-4 text-neo-dark">Account</h3>
         <div className="flex items-center gap-4">
           <div className={`p-4 border-3 border-neo-dark shadow-neo-sm bg-white`}>
-            {tier === 'ultra' ? <Crown className="w-8 h-8 text-neo-dark" /> : <Zap className="w-8 h-8 text-neo-dark" />}
+            <Crown className="w-8 h-8 text-neo-dark" />
           </div>
           <div>
-            <div className="font-black font-display text-2xl uppercase text-neo-dark">{tier === 'ultra' ? 'Ultra' : 'Free'} Tier</div>
-            <div className="text-sm font-bold text-neo-dark/80">{tier === 'ultra' ? 'Unlimited everything' : '2 keys, 30 req/min'}</div>
+            <div className="font-black font-display text-2xl uppercase text-neo-dark">Ultra Tier</div>
+            <div className="text-sm font-bold text-neo-dark/80">Unlimited everything</div>
           </div>
         </div>
-        {tier === 'free' && (
-          <div className="mt-6 flex flex-col gap-3">
-            <button className="w-full py-4 bg-neo-pink text-neo-dark border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all shadow-neo-sm cursor-pointer">
-              Upgrade to Ultra — $2/month
-            </button>
-            <p className="text-neo-dark font-bold text-sm text-center tracking-wide">
-              🔥 ULTRA ACCOUNT AVAILABLE FOR A LIMITED TIME! WE ARE SO CLOSE TO LAUNCH! 🔥
-            </p>
-          </div>
-        )}
+        
+        <div className="mt-6 bg-white border-2 border-neo-dark p-3 shadow-neo-sm">
+          <p className="text-neo-dark font-bold text-sm tracking-wide">
+            Enjoy! We are giving Ultra access to new users.
+          </p>
+        </div>
       </div>
       
       <div className="bg-neo-cyan border-3 border-neo-dark shadow-neo-md p-6">
