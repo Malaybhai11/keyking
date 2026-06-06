@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Filter, Trash2, Activity, Clock } from 'lucide-react'
 import { useEvents } from '../App'
 
@@ -68,41 +68,50 @@ export default function RoutingLogPage() {
               </tr>
             )}
             {filtered.map(event => (
-              <tr key={event.id} className="hover:bg-neo-bg transition-colors">
-                <td className="py-4 px-6">
-                  <span className="font-mono text-sm font-bold text-neo-dark">
-                    {new Date(event.timestamp * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                </td>
-                <td className="py-4 px-6">
-                  <span className="px-3 py-1.5 bg-white border-2 border-neo-dark shadow-neo-sm text-sm font-black font-display uppercase text-neo-dark">
-                    {event.provider}
-                  </span>
-                </td>
-                <td className="py-4 px-6">
-                  <div className="flex items-center gap-3">
-                    <div className="h-3 rounded-none w-16 bg-white border-2 border-neo-dark shadow-neo-sm overflow-hidden">
-                      <div 
-                        className={`h-full ${event.latency_ms < 500 ? 'bg-neo-green border-r-2 border-neo-dark' : event.latency_ms < 1500 ? 'bg-neo-yellow border-r-2 border-neo-dark' : 'bg-neo-pink border-r-2 border-neo-dark'}`} 
-                        style={{ width: `${Math.min(100, (event.latency_ms / 2000) * 100)}%` }} 
-                      />
+              <React.Fragment key={event.id}>
+                <tr className="hover:bg-neo-bg transition-colors">
+                  <td className="py-4 px-6">
+                    <span className="font-mono text-sm font-bold text-neo-dark">
+                      {new Date(event.timestamp * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className="px-3 py-1.5 bg-white border-2 border-neo-dark shadow-neo-sm text-sm font-black font-display uppercase text-neo-dark">
+                      {event.provider}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-3 rounded-none w-16 bg-white border-2 border-neo-dark shadow-neo-sm overflow-hidden">
+                        <div 
+                          className={`h-full ${event.latency_ms < 500 ? 'bg-neo-green border-r-2 border-neo-dark' : event.latency_ms < 1500 ? 'bg-neo-yellow border-r-2 border-neo-dark' : 'bg-neo-pink border-r-2 border-neo-dark'}`} 
+                          style={{ width: `${Math.min(100, (event.latency_ms / 2000) * 100)}%` }} 
+                        />
+                      </div>
+                      <span className="font-mono font-bold text-sm text-neo-dark">{event.latency_ms}ms</span>
                     </div>
-                    <span className="font-mono font-bold text-sm text-neo-dark">{event.latency_ms}ms</span>
-                  </div>
-                </td>
-                <td className="py-4 px-6 text-neo-dark font-black text-lg">
-                  {event.tokens_used.toLocaleString()}
-                </td>
-                <td className="py-4 px-6 text-right">
-                  <span className={`inline-flex items-center justify-center px-3 py-1 font-display uppercase text-xs font-black border-2 border-neo-dark shadow-neo-sm ${
-                    event.success 
-                      ? 'bg-neo-green text-neo-dark' 
-                      : 'bg-neo-pink text-white'
-                  }`}>
-                    {event.success ? 'Success' : 'Failed'}
-                  </span>
-                </td>
-              </tr>
+                  </td>
+                  <td className="py-4 px-6 text-neo-dark font-black text-lg">
+                    {event.tokens_used.toLocaleString()}
+                  </td>
+                  <td className="py-4 px-6 text-right">
+                    <span className={`inline-flex items-center justify-center px-3 py-1 font-display uppercase text-xs font-black border-2 border-neo-dark shadow-neo-sm ${
+                      event.success 
+                        ? 'bg-neo-green text-neo-dark' 
+                        : 'bg-neo-pink text-white'
+                    }`}>
+                      {event.success ? 'Success' : 'Failed'}
+                    </span>
+                  </td>
+                </tr>
+                {event.error_msg && (
+                  <tr className="bg-neo-pink/10">
+                    <td colSpan={5} className="py-3 px-6 text-neo-pink font-bold font-mono text-sm break-all">
+                      ⚠️ ERROR: {event.error_msg}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

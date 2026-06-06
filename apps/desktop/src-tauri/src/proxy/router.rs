@@ -207,6 +207,7 @@ impl ProxyRouter {
                             latency_ms: latency,
                             tokens_used: resp.usage.total_tokens,
                             success: true,
+                            error_msg: None,
                         });
                         let chunk = serde_json::json!({
                             "id": resp.id,
@@ -259,9 +260,9 @@ impl ProxyRouter {
                 .send().await
             {
                 Ok(r) => r,
-                Err(_) => {
+                Err(e) => {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(e.to_string()) });
                     return Err(());
                 }
             };
@@ -270,17 +271,17 @@ impl ProxyRouter {
             if status == 401 {
                 self.vault.vault.lock().await.set_key_validity(&key_entry.id, false);
                 self.circuit_breaker.trip(&key_entry.id, Duration::from_secs(300)).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 401 Unauthorized")) });
                 return Err(());
             }
             if status == 429 {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 429 Rate Limited")) });
                 return Err(());
             }
             if !upstream.status().is_success() {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
                 return Err(());
             }
 
@@ -302,6 +303,7 @@ impl ProxyRouter {
                 latency_ms: latency,
                 tokens_used: 0,
                 success: true,
+                error_msg: None,
             });
 
             Ok(Sse::new(stream).into_response())
@@ -323,24 +325,24 @@ impl ProxyRouter {
                         latency_ms: latency,
                         tokens_used: resp.usage.total_tokens,
                         success: true,
+                        error_msg: None,
                     });
                     let body = serde_json::to_string(&resp).unwrap_or_default();
                     Ok(([("Content-Type", "application/json"), ("x-keyking-latency-ms", &latency.to_string())], body).into_response())
                 }
-                Err(AdapterError::ApiError { status: 401, .. }) => {
-                    self.vault.vault.lock().await.set_key_validity(&key_entry.id, false);
-                    self.circuit_breaker.trip(&key_entry.id, Duration::from_secs(300)).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
+                Err(AdapterError::ApiError { status, message }) => {
+                    if status == 401 {
+                        self.vault.vault.lock().await.set_key_validity(&key_entry.id, false);
+                        self.circuit_breaker.trip(&key_entry.id, Duration::from_secs(300)).await;
+                    } else {
+                        self.circuit_breaker.record_failure(&key_entry.id).await;
+                    }
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("API Error {}: {}", status, message)) });
                     Err(())
                 }
-                Err(AdapterError::ApiError { status: 429, .. }) => {
+                Err(e) => {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
-                    Err(())
-                }
-                Err(_) => {
-                    self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false });
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(e.to_string()) });
                     Err(())
                 }
             }
@@ -551,6 +553,7 @@ impl ProxyRouter {
             latency_ms: start.elapsed().as_millis() as u64,
             tokens_used: 0,
             success: false,
+            error_msg: Some("No valid API keys available".to_string()),
         });
 
         (StatusCode::UNAUTHORIZED, Json(json!({

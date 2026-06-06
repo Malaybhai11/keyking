@@ -18,6 +18,7 @@ export interface RoutingEvent {
   latency_ms: number
   tokens_used: number
   success: boolean
+  error_msg?: string
 }
 
 interface EventContextValue {

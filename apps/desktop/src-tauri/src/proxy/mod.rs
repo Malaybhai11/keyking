@@ -10,6 +10,8 @@ pub struct RoutingEvent {
     pub latency_ms: u64,
     pub tokens_used: u32,
     pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_msg: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
