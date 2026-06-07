@@ -2,15 +2,65 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PostHog } from 'posthog-node';
 import semver from 'semver';
 
-// Initialize PostHog server client using environment variables
-const phClient = new PostHog(
-  process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || 'phc_wsBwU2tc3HXLoaYwo9ikBfZc2vGqXcmCyAnfu2Hy8uyw',
-  {
-    host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://t.keyking.ledgion.in',
-    flushAt: 1,
-    flushInterval: 0
+const FLAG_KEY = 'app-version-policy';
+const SAFE_MIN_ALLOWED_VERSION = '3.0.0';
+
+const posthogProjectApiKey =
+  process.env.POSTHOG_PROJECT_API_KEY ||
+  process.env.NEXT_PUBLIC_POSTHOG_KEY ||
+  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+
+const posthogHost = process.env.POSTHOG_HOST || process.env.POSTHOG_API_HOST;
+const posthogPersonalApiKey = process.env.POSTHOG_PERSONAL_API_KEY;
+
+const phClient = posthogProjectApiKey
+  ? new PostHog(posthogProjectApiKey, {
+      host: posthogHost,
+      personalApiKey: posthogPersonalApiKey,
+      enableLocalEvaluation: Boolean(posthogPersonalApiKey),
+      flushAt: 1,
+      flushInterval: 0,
+    })
+  : null;
+
+function normalizeVersion(value: string | null): string | null {
+  if (!value) return null;
+  return semver.valid(value) || semver.coerce(value)?.version || null;
+}
+
+async function getMinAllowedVersion(distinctId: string): Promise<string> {
+  let payload: unknown;
+
+  if (!phClient) {
+    return SAFE_MIN_ALLOWED_VERSION;
   }
-);
+
+  try {
+    const flags = await phClient.evaluateFlags(distinctId, {
+      flagKeys: [FLAG_KEY],
+    });
+    payload = flags.getFlagPayload(FLAG_KEY);
+  } catch (error) {
+    console.error('Error evaluating PostHog flag payload:', error);
+  }
+
+  if (!payload && posthogPersonalApiKey) {
+    try {
+      payload = await phClient.getRemoteConfigPayload(FLAG_KEY);
+    } catch (error) {
+      console.error('Error loading PostHog remote config payload:', error);
+    }
+  }
+
+  const minAllowedVersion =
+    typeof payload === 'object' && payload !== null && 'min_allowed_version' in payload
+      ? (payload as { min_allowed_version?: unknown }).min_allowed_version
+      : undefined;
+
+  return typeof minAllowedVersion === 'string' && normalizeVersion(minAllowedVersion)
+    ? minAllowedVersion
+    : SAFE_MIN_ALLOWED_VERSION;
+}
 
 export async function GET(req: NextRequest) {
   const clientVersion = req.headers.get('x-app-version');
@@ -21,14 +71,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Correct PostHog Node SDK usage with distinctId (userEmail)
-    // For evaluating feature flags reliably per user
-    const payload = await phClient.getFeatureFlagPayload('app-version-policy', userEmail);
-    
-    // Default to "1.0.0" if the flag isn't set, ensuring it passes for legitimate users if PostHog config is missing
-    const minVersion = (payload as any)?.min_allowed_version || "1.0.0";
+    const normalizedClientVersion = normalizeVersion(clientVersion);
+    if (!normalizedClientVersion) {
+      return NextResponse.json({ allowed: true, reason: 'Valid' });
+    }
 
-    const isAllowed = semver.gte(clientVersion, minVersion);
+    const minVersion = await getMinAllowedVersion(userEmail);
+    const normalizedMinVersion = normalizeVersion(minVersion) || SAFE_MIN_ALLOWED_VERSION;
+
+    const isAllowed = semver.gte(normalizedClientVersion, normalizedMinVersion);
 
     return NextResponse.json({ 
       allowed: isAllowed,
@@ -36,7 +87,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error evaluating PostHog feature flag:", error);
-    // Fail open or fail closed? We choose to fail open if PostHog is down to prevent breaking UX.
-    return NextResponse.json({ allowed: true, reason: "Fallback allowed due to internal error" });
+    return NextResponse.json({ allowed: true, reason: "Valid" });
   }
 }

@@ -9,7 +9,7 @@ export function PHProvider({
   children: React.ReactNode
 }) {
   useEffect(() => {
-    const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || 'phc_wsBwU2tc3HXLoaYwo9ikBfZc2vGqXcmCyAnfu2Hy8uyw'
+    const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
     // Only initialize if we have the environment variable
     if (posthogKey) {
       posthog.init(posthogKey, {
