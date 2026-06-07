@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
+import { getVersion } from '@tauri-apps/api/app'
 import { Key, LayoutDashboard, Activity, ShieldAlert, Settings, Terminal, LogIn, GripVertical } from 'lucide-react'
 import DashboardPage from './pages/DashboardPage'
 import KeysPage from './pages/KeysPage'
@@ -151,40 +152,117 @@ function Sidebar() {
 }
 
 function App() {
-  const [session, setSession] = useState<{session_id: string, user_id: string} | null>(() => {
+  const [session, setSession] = useState<{session_id: string, user_id: string, email?: string} | null>(() => {
     const saved = localStorage.getItem('auth_session')
     return saved ? JSON.parse(saved) : null
   })
+  const [isLocked, setIsLocked] = useState<boolean | 'loading'>('loading')
+  const [lockReason, setLockReason] = useState<string>('')
 
   const posthog = usePostHog()
 
   useEffect(() => {
-    const unlisten = listen<{session_id: string, user_id: string}>('auth-success', (event) => {
+    const unlisten = listen<{session_id: string, user_id: string, email?: string}>('auth-success', (event) => {
       setSession(event.payload)
       localStorage.setItem('auth_session', JSON.stringify(event.payload))
       invoke('save_session', { session: event.payload }).catch(console.error)
       if (posthog) {
-        posthog.identify(event.payload.user_id, { email: event.payload.user_id })
+        posthog.identify(event.payload.user_id, { email: event.payload.email || event.payload.user_id })
       }
     })
     return () => { unlisten.then(fn => fn()) }
   }, [posthog])
 
   useEffect(() => {
-    invoke<{session_id: string, user_id: string} | null>('get_session').then(sess => {
-      if (sess) {
-        setSession(sess)
-        localStorage.setItem('auth_session', JSON.stringify(sess))
+    async function init() {
+      let sess = session;
+      if (!sess) {
+        try {
+          sess = await invoke<{session_id: string, user_id: string, email?: string} | null>('get_session');
+          if (sess) {
+            setSession(sess);
+            localStorage.setItem('auth_session', JSON.stringify(sess));
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
-    }).catch(console.error)
-  }, [])
+
+      try {
+        const version = await getVersion();
+        // Determine the API host to check against. Use local for dev, remote for prod.
+        const host = import.meta.env.VITE_API_HOST || 'https://keyking.ledgion.in';
+        const res = await fetch(`${host}/api/check-version`, {
+          headers: {
+            'x-app-version': version,
+            'x-user-email': sess?.email || sess?.user_id || 'anonymous_desktop'
+          }
+        });
+        const data = await res.json();
+        if (!data.allowed) {
+          setIsLocked(true);
+          setLockReason(data.reason || 'Upgrade Required');
+          if (posthog) posthog.reset();
+          localStorage.removeItem('auth_session');
+          await invoke('clear_session').catch(console.error);
+          setSession(null);
+          return;
+        }
+        
+        await invoke('update_lease');
+        setIsLocked(false);
+      } catch (e) {
+        // Offline fallback
+        try {
+          const isLeaseValid = await invoke<boolean>('check_lease');
+          if (!isLeaseValid) {
+            setIsLocked(true);
+            setLockReason('Please connect to the internet once to verify your app status.');
+            return;
+          }
+          setIsLocked(false);
+        } catch(err) {
+          setIsLocked(false);
+        }
+      }
+    }
+    
+    init();
+  }, []) // run once on mount
 
   useEffect(() => {
     if (session && posthog) {
-      posthog.identify(session.user_id, { email: session.user_id })
+      posthog.identify(session.user_id, { email: session.email || session.user_id })
     }
   }, [session, posthog])
 
+  if (isLocked === 'loading') {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-neo-bg text-neo-dark font-body">
+        <div className="w-12 h-12 border-4 border-neo-dark border-t-neo-pink rounded-full animate-spin"></div>
+      </div>
+    )
+  }
+
+  if (isLocked === true) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-neo-bg text-neo-dark font-body">
+        <div className="p-10 bg-white border-6 border-neo-dark shadow-neo-xl flex flex-col items-center max-w-sm text-center">
+          <div className="w-20 h-20 bg-neo-pink flex items-center justify-center border-3 border-neo-dark shadow-neo-sm mb-6">
+            <ShieldAlert className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-3xl font-black font-display tracking-tight uppercase mb-4 text-[#ff2a85]">Action Required</h1>
+          <p className="text-sm font-bold text-neo-dark/90 mb-8 px-2">{lockReason}</p>
+          <button
+            onClick={() => invoke('open_browser', { url: "https://keyking.ledgion.in/download" })}
+            className="flex items-center gap-2 bg-neo-yellow text-neo-dark px-6 py-4 border-3 border-neo-dark font-display font-black uppercase hover:-translate-y-1 hover:shadow-neo-md transition-all w-full justify-center cursor-pointer"
+          >
+            Get Latest Version
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!session) {
     return (

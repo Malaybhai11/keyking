@@ -49,7 +49,9 @@ fn main() {
             commands::get_available_models,
             commands::save_session,
             commands::get_session,
-            commands::clear_session
+            commands::clear_session,
+            commands::update_lease,
+            commands::check_lease
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -88,9 +90,11 @@ async fn handle_auth_callback(
     if let Some(session_id) = params.get("session_id") {
         if let Some(user_id) = params.get("user_id") {
             if let Some(handle) = &state.app_handle {
+                let email = params.get("email").cloned().unwrap_or_else(|| user_id.clone());
                 handle.emit("auth-success", serde_json::json!({
                     "session_id": session_id,
-                    "user_id": user_id
+                    "user_id": user_id,
+                    "email": email
                 })).ok();
             }
         }

@@ -24,6 +24,7 @@ export default async function AppCallback() {
   const callbackUrl = new URL("http://localhost:8787/auth/callback");
   callbackUrl.searchParams.set("session_id", session.session.id);
   callbackUrl.searchParams.set("user_id", session.user.id);
+  callbackUrl.searchParams.set("email", session.user.email);
   
   redirect(callbackUrl.toString());
 }

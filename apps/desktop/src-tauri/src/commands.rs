@@ -397,3 +397,31 @@ pub async fn clear_session(state: tauri::State<'_, SharedVault>) -> Result<(), S
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn update_lease(state: tauri::State<'_, SharedVault>) -> Result<(), String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("offline_lease.json");
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+    let content = serde_json::json!({ "last_verified_online": now });
+    std::fs::write(&path, content.to_string()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_lease(state: tauri::State<'_, SharedVault>) -> Result<bool, String> {
+    let vault = state.vault.lock().await;
+    let path = vault.data_dir.join("offline_lease.json");
+    if path.exists() {
+        let content = std::fs::read_to_string(&path).unwrap_or_default();
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(last) = json.get("last_verified_online").and_then(|v| v.as_u64()) {
+                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                // 7 days = 7 * 24 * 60 * 60 = 604800 seconds
+                return Ok(now - last <= 604800);
+            }
+        }
+    }
+    // If no lease exists or it's invalid, treat as expired
+    Ok(false)
+}
