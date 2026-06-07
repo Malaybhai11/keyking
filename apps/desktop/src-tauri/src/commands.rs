@@ -421,7 +421,10 @@ pub async fn check_lease(state: tauri::State<'_, SharedVault>) -> Result<bool, S
                 return Ok(now - last <= 604800);
             }
         }
+        // Lease file exists but is corrupt — allow through
+        return Ok(true);
     }
-    // If no lease exists or it's invalid, treat as expired
-    Ok(false)
+    // No lease file = fresh install, never been online-verified yet.
+    // Allow through so the user can sign in for the first time.
+    Ok(true)
 }

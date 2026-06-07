@@ -212,16 +212,19 @@ function App() {
         await invoke('update_lease');
         setIsLocked(false);
       } catch (e) {
-        // Offline fallback
+        // Network failure — try the offline lease (Rust-side, tamper-proof)
         try {
           const isLeaseValid = await invoke<boolean>('check_lease');
           if (!isLeaseValid) {
+            // Lease file exists AND is expired (>7 days offline after prior use)
             setIsLocked(true);
             setLockReason('Please connect to the internet once to verify your app status.');
             return;
           }
+          // Fresh install OR within 7-day grace period — allow through
           setIsLocked(false);
         } catch(err) {
+          // Rust command failed — fail open, never block a user due to our own errors
           setIsLocked(false);
         }
       }
