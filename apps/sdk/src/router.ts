@@ -383,36 +383,52 @@ export async function routeRequest(
     throw new NoProviderError(originalModel);
   }
 
-  // Build a lookup map: provider → API key
-  const keyMap = new Map<string, string>();
+  // Build a lookup map: provider → array of API keys
+  const providerKeys = new Map<string, string[]>();
   for (const entry of vaultEntries) {
-    keyMap.set(entry.provider, entry.key);
+    if (!providerKeys.has(entry.provider)) {
+      providerKeys.set(entry.provider, []);
+    }
+    providerKeys.get(entry.provider)!.push(entry.key);
   }
 
-  // Build the ordered list of (provider, model) pairs to try
-  const attempts: { provider: Provider; model: string }[] = [];
+  // Build the ordered list of (provider, model, key) pairs to try
+  const attempts: { provider: Provider; model: string; key: string }[] = [];
 
   // Primary provider first
-  if (keyMap.has(primaryProvider)) {
-    attempts.push({ provider: primaryProvider, model: originalModel });
+  const primaryKeys = providerKeys.get(primaryProvider);
+  if (primaryKeys) {
+    for (const key of primaryKeys) {
+      attempts.push({ provider: primaryProvider, model: originalModel, key });
+    }
   }
 
   // Fallback providers
   const fallbacks = getFallbackProviders(primaryProvider);
   for (const fallbackProvider of fallbacks) {
-    if (!keyMap.has(fallbackProvider)) continue;
+    const keys = providerKeys.get(fallbackProvider);
+    if (!keys) continue;
+
+    let targetModel = originalModel;
+    let shouldAdd = false;
 
     if (fallbackProvider === "Groq" && primaryProvider === "OpenAI") {
       // Map OpenAI model → Groq equivalent
       const groqModel = mapToGroqModel(originalModel);
       if (groqModel) {
-        attempts.push({ provider: "Groq", model: groqModel });
+        targetModel = groqModel;
+        shouldAdd = true;
       }
     } else if (fallbackProvider === "OpenRouter") {
       // OpenRouter can handle most models directly
-      attempts.push({ provider: "OpenRouter", model: originalModel });
+      shouldAdd = true;
     }
-    // Other fallbacks require the model to be from their ecosystem, skip
+    
+    if (shouldAdd) {
+      for (const key of keys) {
+        attempts.push({ provider: fallbackProvider, model: targetModel, key });
+      }
+    }
   }
 
   if (attempts.length === 0) {
@@ -424,13 +440,10 @@ export async function routeRequest(
   const errors: ProviderError[] = [];
 
   for (let i = 0; i < maxAttempts; i++) {
-    const { provider, model } = attempts[i];
-    const apiKey = keyMap.get(provider);
-
-    if (!apiKey) continue;
+    const { provider, model, key } = attempts[i];
 
     try {
-      return await sendToProvider(provider, apiKey, request, model, {
+      return await sendToProvider(provider, key, request, model, {
         timeout: config.timeout,
         debug: config.debug,
       });
