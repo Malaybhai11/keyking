@@ -28,13 +28,12 @@ export default function DownloadPage() {
       : "curl -fsSL https://keyking.ledgion.in/install.sh | bash";
   };
 
-  const LATEST_VERSION = "v2.1.0";
   const GITHUB_REPO = "Malaybhai11/keyking";
   
   const DOWNLOAD_LINKS = {
-    windows: `https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/keyking_windows_amd64.zip`,
-    mac: `https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/keyking_darwin_universal.tar.gz`,
-    linux: `https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/keyking_linux_amd64.tar.gz`,
+    windows: `https://github.com/${GITHUB_REPO}/releases/latest/download/keyking_windows_amd64.zip`,
+    mac: `https://github.com/${GITHUB_REPO}/releases/latest/download/keyking_darwin_universal.tar.gz`,
+    linux: `https://github.com/${GITHUB_REPO}/releases/latest/download/keyking_linux_amd64.tar.gz`,
   };
 
   return (
@@ -48,7 +47,7 @@ export default function DownloadPage() {
           </Link>
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-black font-display uppercase tracking-tighter">KEYKING</h1>
-            <NeoBadge variant="pink">{LATEST_VERSION}</NeoBadge>
+            <NeoBadge variant="pink">LATEST RELEASE</NeoBadge>
           </div>
         </header>
 
