@@ -837,7 +837,7 @@ console.log(response.choices[0].message.content);`
                 </ul>
               </div>
 
-              <a href="http://localhost:8000/billing/checkout" target="_blank" rel="noopener noreferrer" className="block w-full">
+              <a href="/billing/checkout" className="block w-full">
                 <NeoButton variant="pink" className="w-full">
                   Upgrade to Ultra Tier
                 </NeoButton>
