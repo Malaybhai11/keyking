@@ -9,10 +9,24 @@ set -e
 
 # ─────────────────────────── Configuration ────────────────────────────
 APP_NAME="keyking"
-VERSION="3.0.0"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="$HOME/.config/keyking"
 GITHUB_REPO="Malaybhai11/keyking"
+
+# Fetch latest version dynamically from GitHub API (no hardcoded version ever again)
+VERSION=""
+if command -v curl &>/dev/null; then
+    VERSION=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
+        | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"v\([^"]*\)".*/\1/')
+elif command -v wget &>/dev/null; then
+    VERSION=$(wget -qO- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
+        | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"v\([^"]*\)".*/\1/')
+fi
+
+# Hard fallback if API is unreachable
+if [ -z "$VERSION" ]; then
+    VERSION="3.0.1"
+fi
 
 # ─────────────────────────── Theme Colors ─────────────────────────────
 RESET='\033[0m'
