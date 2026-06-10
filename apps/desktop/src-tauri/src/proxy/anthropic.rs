@@ -9,8 +9,7 @@ use futures::stream::StreamExt;
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::proxy::{NormalizedRequest, router::ProxyRouter, RoutingEvent};
-use std::time::Duration;
+use crate::proxy::{NormalizedRequest, router::ProxyRouter};
 
 pub async fn handle_anthropic_messages(
     State(router): State<Arc<ProxyRouter>>,
@@ -18,7 +17,6 @@ pub async fn handle_anthropic_messages(
 ) -> Response {
     let raw = req_body.0;
     
-    // Convert Anthropic payload to OpenAI NormalizedRequest
     let mut messages: Vec<serde_json::Value> = Vec::new();
     
     if let Some(system) = raw.get("system") {
@@ -41,15 +39,67 @@ pub async fn handle_anthropic_messages(
     
     if let Some(msgs) = raw.get("messages").and_then(|m| m.as_array()) {
         for msg in msgs {
-            messages.push(msg.clone());
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
+            if let Some(content_arr) = msg.get("content").and_then(|c| c.as_array()) {
+                let mut text_content = String::new();
+                let mut tool_calls = Vec::new();
+                let mut is_tool_result = false;
+                
+                for item in content_arr {
+                    let ctype = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                    if ctype == "text" {
+                        if let Some(t) = item.get("text").and_then(|t| t.as_str()) {
+                            text_content.push_str(t);
+                        }
+                    } else if ctype == "tool_use" {
+                        let id = item.get("id").cloned().unwrap_or_default();
+                        let name = item.get("name").cloned().unwrap_or_default();
+                        let input = item.get("input").cloned().unwrap_or(json!({}));
+                        tool_calls.push(json!({
+                            "id": id,
+                            "type": "function",
+                            "function": {
+                                "name": name,
+                                "arguments": input.to_string()
+                            }
+                        }));
+                    } else if ctype == "tool_result" {
+                        is_tool_result = true;
+                        let tool_use_id = item.get("tool_use_id").cloned().unwrap_or_default();
+                        let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+                        messages.push(json!({
+                            "role": "tool",
+                            "tool_call_id": tool_use_id,
+                            "content": content
+                        }));
+                    }
+                }
+                
+                if is_tool_result {
+                    continue;
+                }
+                
+                let mut final_msg = json!({
+                    "role": role,
+                    "content": text_content
+                });
+                
+                if !tool_calls.is_empty() {
+                    final_msg.as_object_mut().unwrap().insert("tool_calls".to_string(), serde_json::Value::Array(tool_calls));
+                }
+                messages.push(final_msg);
+            } else if let Some(content_str) = msg.get("content").and_then(|c| c.as_str()) {
+                messages.push(json!({
+                    "role": role,
+                    "content": content_str
+                }));
+            }
         }
     }
     
     let original_model = raw.get("model").and_then(|m| m.as_str()).unwrap_or("claude-3-7-sonnet-20250219").to_string();
-    
-    // Map Claude models to best Groq/OpenAI alternative for Claude Code
     let target_model = if original_model.starts_with("claude-") {
-        "gpt-4o" // It will be mapped to llama-3.3-70b-versatile by try_provider if groq is chosen
+        "gpt-4o"
     } else {
         &original_model
     };
@@ -68,27 +118,43 @@ pub async fn handle_anthropic_messages(
         extra: std::collections::HashMap::new(),
     };
     
-    // Copy tools
-    if let Some(tools) = raw.get("tools") {
-        normalized.extra.insert("tools".to_string(), tools.clone());
+    if let Some(tools) = raw.get("tools").and_then(|t| t.as_array()) {
+        let mut mapped_tools = Vec::new();
+        for tool in tools {
+            let name = tool.get("name").cloned().unwrap_or_default();
+            let description = tool.get("description").cloned().unwrap_or_default();
+            let input_schema = tool.get("input_schema").cloned().unwrap_or(json!({"type": "object"}));
+            
+            mapped_tools.push(json!({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": description,
+                    "parameters": input_schema
+                }
+            }));
+        }
+        normalized.extra.insert("tools".to_string(), serde_json::Value::Array(mapped_tools));
     }
-    if let Some(tool_choice) = raw.get("tool_choice") {
-        normalized.extra.insert("tool_choice".to_string(), tool_choice.clone());
+    
+    if let Some(tool_choice) = raw.get("tool_choice").and_then(|tc| tc.as_object()) {
+        if let Some(tc_type) = tool_choice.get("type").and_then(|t| t.as_str()) {
+            if tc_type == "tool" {
+                let name = tool_choice.get("name").cloned().unwrap_or_default();
+                normalized.extra.insert("tool_choice".to_string(), json!({
+                    "type": "function",
+                    "function": {"name": name}
+                }));
+            } else if tc_type == "any" {
+                normalized.extra.insert("tool_choice".to_string(), json!("required"));
+            } else if tc_type == "auto" {
+                normalized.extra.insert("tool_choice".to_string(), json!("auto"));
+            }
+        }
     }
 
-    // Call try_provider logic internally
-    // To do this simply without refactoring the whole router, we can invoke handle_chat
-    // But handle_chat requires headers and Json<NormalizedRequest>
-    // And it returns an OpenAI formatted response.
-    // Instead of making it complex, let's just make an internal request to our own localhost proxy!
     let client = reqwest::Client::new();
-    let port = router.app_handle.as_ref()
-        .map(|h| h.config().build.dev_url.clone())
-        .unwrap_or_default();
-    
-    // A much simpler zero-config hack: Send it to our own `/v1/chat/completions` !
     let self_url = "http://127.0.0.1:8787/v1/chat/completions";
-    
     let system_key = router.system_key.as_str();
     
     let mut upstream_req = client.post(self_url)
@@ -97,7 +163,7 @@ pub async fn handle_anthropic_messages(
         
     let response = match upstream_req.send().await {
         Ok(res) => res,
-        Err(_) => return (StatusCode::BAD_GATEWAY, "Failed to reach internal proxy").into_response(),
+        Err(e) => return (StatusCode::BAD_GATEWAY, format!("Failed internal proxy: {}", e)).into_response(),
     };
     
     if !response.status().is_success() {
@@ -107,22 +173,39 @@ pub async fn handle_anthropic_messages(
     }
     
     if !stream {
-        // Non-streaming translation
         let openai_resp: serde_json::Value = response.json().await.unwrap_or_else(|_| json!({}));
         let content = openai_resp["choices"][0]["message"]["content"].as_str().unwrap_or("");
+        
+        let mut anthropic_content = Vec::new();
+        if !content.is_empty() {
+            anthropic_content.push(json!({
+                "type": "text",
+                "text": content
+            }));
+        }
+        
+        if let Some(tool_calls) = openai_resp["choices"][0]["message"].get("tool_calls").and_then(|t| t.as_array()) {
+            for tc in tool_calls {
+                let id = tc.get("id").cloned().unwrap_or_default();
+                let name = tc["function"].get("name").cloned().unwrap_or_default();
+                let args_str = tc["function"].get("arguments").and_then(|a| a.as_str()).unwrap_or("{}");
+                let args_json: serde_json::Value = serde_json::from_str(args_str).unwrap_or(json!({}));
+                anthropic_content.push(json!({
+                    "type": "tool_use",
+                    "id": id,
+                    "name": name,
+                    "input": args_json
+                }));
+            }
+        }
         
         let anthropic_resp = json!({
             "id": openai_resp["id"],
             "type": "message",
             "role": "assistant",
             "model": original_model,
-            "content": [
-                {
-                    "type": "text",
-                    "text": content
-                }
-            ],
-            "stop_reason": "end_turn",
+            "content": anthropic_content,
+            "stop_reason": if openai_resp["choices"][0]["finish_reason"].as_str() == Some("tool_calls") { "tool_use" } else { "end_turn" },
             "stop_sequence": null,
             "usage": {
                 "input_tokens": openai_resp["usage"]["prompt_tokens"],
@@ -132,12 +215,10 @@ pub async fn handle_anthropic_messages(
         return axum::Json(anthropic_resp).into_response();
     }
 
-    // Streaming Translation
     let mut byte_stream = response.bytes_stream();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     
     tokio::spawn(async move {
-        // Emit message_start
         let _ = tx.send(Event::default().data(json!({
             "type": "message_start",
             "message": {
@@ -149,7 +230,6 @@ pub async fn handle_anthropic_messages(
             }
         }).to_string()));
         
-        // Emit content_block_start
         let _ = tx.send(Event::default().data(json!({
             "type": "content_block_start",
             "index": 0,
@@ -160,6 +240,9 @@ pub async fn handle_anthropic_messages(
         }).to_string()));
 
         let mut buffer = String::new();
+        let mut active_indices = std::collections::HashSet::new();
+        active_indices.insert(0);
+        
         while let Some(Ok(chunk)) = byte_stream.next().await {
             buffer.push_str(&String::from_utf8_lossy(&chunk));
             
@@ -174,16 +257,57 @@ pub async fn handle_anthropic_messages(
                         continue;
                     }
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                        if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
-                            if !content.is_empty() {
-                                let _ = tx.send(Event::default().data(json!({
-                                    "type": "content_block_delta",
-                                    "index": 0,
-                                    "delta": {
-                                        "type": "text_delta",
-                                        "text": content
+                        if let Some(choices) = json.get("choices").and_then(|c| c.as_array()) {
+                            if let Some(delta) = choices.get(0).and_then(|c| c.get("delta")) {
+                                if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
+                                    if !content.is_empty() {
+                                        let _ = tx.send(Event::default().data(json!({
+                                            "type": "content_block_delta",
+                                            "index": 0,
+                                            "delta": {
+                                                "type": "text_delta",
+                                                "text": content
+                                            }
+                                        }).to_string()));
                                     }
-                                }).to_string()));
+                                }
+                                
+                                if let Some(tool_calls) = delta.get("tool_calls").and_then(|t| t.as_array()) {
+                                    for tc in tool_calls {
+                                        let index = tc.get("index").and_then(|i| i.as_u64()).unwrap_or(0) + 1;
+                                        active_indices.insert(index);
+                                        
+                                        if let Some(id) = tc.get("id").and_then(|i| i.as_str()) {
+                                            if let Some(function) = tc.get("function") {
+                                                let name = function.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                                                let _ = tx.send(Event::default().data(json!({
+                                                    "type": "content_block_start",
+                                                    "index": index,
+                                                    "content_block": {
+                                                        "type": "tool_use",
+                                                        "id": id,
+                                                        "name": name,
+                                                        "input": {}
+                                                    }
+                                                }).to_string()));
+                                            }
+                                        }
+                                        if let Some(function) = tc.get("function") {
+                                            if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
+                                                if !args.is_empty() {
+                                                    let _ = tx.send(Event::default().data(json!({
+                                                        "type": "content_block_delta",
+                                                        "index": index,
+                                                        "delta": {
+                                                            "type": "input_json_delta",
+                                                            "partial_json": args
+                                                        }
+                                                    }).to_string()));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -191,8 +315,10 @@ pub async fn handle_anthropic_messages(
             }
         }
         
-        // Emit closing events
-        let _ = tx.send(Event::default().data(json!({"type": "content_block_stop", "index": 0}).to_string()));
+        for idx in active_indices {
+            let _ = tx.send(Event::default().data(json!({"type": "content_block_stop", "index": idx}).to_string()));
+        }
+        
         let _ = tx.send(Event::default().data(json!({
             "type": "message_delta",
             "delta": {"stop_reason": "end_turn", "stop_sequence": null}
