@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Key King",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "identifier": "com.keyking.desktop",
   "build": {
     "beforeBuildCommand": "npm run build",
