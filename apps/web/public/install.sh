@@ -534,7 +534,10 @@ if ! command -v claude &> /dev/null; then
     exit 1
 fi
 export ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
-export ANTHROPIC_AUTH_TOKEN="kk-zero-config"
+export ANTHROPIC_API_KEY="kk-zero-config"
+unset AWS_PROFILE
+unset AWS_ACCESS_KEY_ID
+unset AWS_REGION
 echo "👑 Routing Claude Code through KeyKing..."
 exec claude "$@"
 EOF

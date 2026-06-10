@@ -237,7 +237,10 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 set ANTHROPIC_BASE_URL=http://127.0.0.1:8787
-set ANTHROPIC_AUTH_TOKEN=kk-zero-config
+set ANTHROPIC_API_KEY=kk-zero-config
+set AWS_PROFILE=
+set AWS_ACCESS_KEY_ID=
+set AWS_REGION=
 echo 👑 Routing Claude Code through KeyKing...
 claude %*
 endlocal
