@@ -19,6 +19,15 @@ impl ProviderAdapter for GroqAdapter {
 
         let mut mapped_req = req.clone();
         mapped_req.model = model.to_string();
+        if let Some(tokens) = mapped_req.max_tokens {
+            mapped_req.max_tokens = Some(tokens.min(4096));
+        }
+        
+        if let Some(tc) = mapped_req.extra.get_mut("tool_choice") {
+            if tc.as_str() == Some("required") {
+                *tc = serde_json::json!("auto");
+            }
+        }
 
         let response = client
             .post("https://api.groq.com/openai/v1/chat/completions")

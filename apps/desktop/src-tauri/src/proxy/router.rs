@@ -244,16 +244,33 @@ impl ProxyRouter {
             } else {
                 req.model.clone()
             };
-            let stream_req = serde_json::json!({
+            let mut effective_max_tokens = req.max_tokens;
+            if provider == "Groq" {
+                if let Some(tokens) = effective_max_tokens {
+                    effective_max_tokens = Some(tokens.min(4096));
+                }
+            }
+
+            let mut stream_req = serde_json::json!({
                 "model": effective_model,
                 "messages": req.messages,
                 "stream": true,
                 "temperature": req.temperature,
-                "max_tokens": req.max_tokens,
+                "max_tokens": effective_max_tokens,
                 "top_p": req.top_p,
                 "frequency_penalty": req.frequency_penalty,
                 "presence_penalty": req.presence_penalty,
             });
+
+            if let Some(obj) = stream_req.as_object_mut() {
+                for (k, v) in &req.extra {
+                    if provider == "Groq" && k == "tool_choice" && v == "required" {
+                        obj.insert(k.clone(), serde_json::json!("auto"));
+                    } else {
+                        obj.insert(k.clone(), v.clone());
+                    }
+                }
+            }
 
             let upstream = match self.client.post(&url)
                 .header("Authorization", format!("Bearer {}", plaintext))
@@ -502,16 +519,33 @@ impl ProxyRouter {
                 } else {
                     req.model.clone()
                 };
-                let stream_req = serde_json::json!({
+                let mut effective_max_tokens = req.max_tokens;
+                if primary_provider == "Groq" {
+                    if let Some(tokens) = effective_max_tokens {
+                        effective_max_tokens = Some(tokens.min(4096));
+                    }
+                }
+                
+                let mut stream_req = serde_json::json!({
                     "model": env_model,
                     "messages": req.messages,
                     "stream": true,
                     "temperature": req.temperature,
-                    "max_tokens": req.max_tokens,
+                    "max_tokens": effective_max_tokens,
                     "top_p": req.top_p,
                     "frequency_penalty": req.frequency_penalty,
                     "presence_penalty": req.presence_penalty,
                 });
+
+                if let Some(obj) = stream_req.as_object_mut() {
+                    for (k, v) in &req.extra {
+                        if primary_provider == "Groq" && k == "tool_choice" && v == "required" {
+                            obj.insert(k.clone(), serde_json::json!("auto"));
+                        } else {
+                            obj.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
                 return match router.client.post(&url)
                     .header("Authorization", format!("Bearer {}", env_key))
                     .header("Content-Type", "application/json")
