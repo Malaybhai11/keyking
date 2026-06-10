@@ -539,7 +539,7 @@ unset AWS_PROFILE
 unset AWS_ACCESS_KEY_ID
 unset AWS_REGION
 echo "👑 Routing Claude Code through KeyKing..."
-exec claude "$@"
+exec claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' "$@"
 EOF
     if [ -w "$INSTALL_DIR" ]; then
         mv "$TMP_DIR/keyking-claude" "$CLAUDE_WRAPPER"

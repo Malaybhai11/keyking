@@ -242,7 +242,7 @@ set AWS_PROFILE=
 set AWS_ACCESS_KEY_ID=
 set AWS_REGION=
 echo 👑 Routing Claude Code through KeyKing...
-claude %*
+claude --settings "{\""env\"":{\""CLAUDE_CODE_USE_BEDROCK\"":\""0\"\",\""CLAUDE_CODE_USE_VERTEX\"":\""0\""}}" %*
 endlocal
 "@
         Set-Content -Path $claudeCmd -Value $cmdContent -Encoding UTF8 -ErrorAction SilentlyContinue
