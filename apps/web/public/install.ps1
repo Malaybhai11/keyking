@@ -226,6 +226,24 @@ function Start-App {
     $appExe = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
     if ($appExe) {
+        $appDir = Split-Path $appExe -Parent
+        $claudeCmd = Join-Path $appDir "keyking-claude.cmd"
+        $cmdContent = @"
+@echo off
+setlocal
+where claude >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code
+    exit /b 1
+)
+set ANTHROPIC_BASE_URL=http://127.0.0.1:8787
+set ANTHROPIC_AUTH_TOKEN=kk-zero-config
+echo 👑 Routing Claude Code through KeyKing...
+claude %*
+endlocal
+"@
+        Set-Content -Path $claudeCmd -Value $cmdContent -Encoding UTF8 -ErrorAction SilentlyContinue
+
         Write-Info "Launching $PRODUCT..."
         Start-Process -FilePath $appExe
         Write-Success "KeyKing is now running!"

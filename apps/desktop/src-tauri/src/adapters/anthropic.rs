@@ -57,20 +57,24 @@ impl ProviderAdapter for AnthropicAdapter {
         let mut anthropic_messages = Vec::new();
 
         for msg in &req.messages {
-            if msg.role == "system" {
-                system_prompt.push_str(&msg.content);
-                system_prompt.push('\n');
+            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("");
+            if role == "system" {
+                if let Some(content) = msg.get("content").and_then(|c| c.as_str()) {
+                    system_prompt.push_str(content);
+                    system_prompt.push('\n');
+                }
             } else {
                 // Map system or developer messages to user if they appear elsewhere,
                 // but standard mapping is user/assistant
-                let role = if msg.role == "developer" {
+                let role = if role == "developer" {
                     "user".to_string()
                 } else {
-                    msg.role.clone()
+                    role.to_string()
                 };
+                
                 anthropic_messages.push(AnthropicMessage {
                     role,
-                    content: msg.content.clone(),
+                    content: msg.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string(),
                 });
             }
         }

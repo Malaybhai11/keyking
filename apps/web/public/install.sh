@@ -525,6 +525,25 @@ else
         fi
     fi
     chmod +x "${INSTALL_DIR}/${APP_NAME}"
+    
+    CLAUDE_WRAPPER="${INSTALL_DIR}/keyking-claude"
+    cat << 'EOF' > "$TMP_DIR/keyking-claude"
+#!/usr/bin/env bash
+if ! command -v claude &> /dev/null; then
+    echo "Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code"
+    exit 1
+fi
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
+export ANTHROPIC_AUTH_TOKEN="kk-zero-config"
+echo "👑 Routing Claude Code through KeyKing..."
+exec claude "$@"
+EOF
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$TMP_DIR/keyking-claude" "$CLAUDE_WRAPPER"
+    else
+        sudo mv "$TMP_DIR/keyking-claude" "$CLAUDE_WRAPPER"
+    fi
+    chmod +x "$CLAUDE_WRAPPER"
 fi
 
 (sleep 0.2) &
@@ -602,9 +621,12 @@ echo -e "  ${BR_YELLOW}  # Add your first API key${RESET}"
 echo -e "    ${BR_YELLOW}\$ keyking keys add openai sk-...${RESET}"
 echo ""
 echo -e "  ${BR_YELLOW}  # Route requests through KeyKing${RESET}"
-echo -e "    ${BR_YELLOW}\$ curl http://localhost:8787/v1/chat/completions \\\\${RESET}"
-echo -e "    ${BR_YELLOW}    -H 'Content-Type: application/json' \\\\${RESET}"
-echo -e "    ${BR_YELLOW}    -d '{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello!\"}]}'${RESET}"
+echo -e "    ${BR_YELLOW}\$ curl http://localhost:8787/v1/chat/completions \\${RESET}
+    ${BR_YELLOW}    -H 'Content-Type: application/json' \\${RESET}
+    ${BR_YELLOW}    -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello!"}]}'${RESET}
+
+  ${BR_YELLOW}  # Use Claude Code with Zero-Config through KeyKing${RESET}
+    ${BR_YELLOW}$ keyking-claude${RESET}"
 echo ""
 
 hr

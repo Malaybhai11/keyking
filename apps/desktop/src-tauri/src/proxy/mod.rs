@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod router;
+pub mod anthropic;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingEvent {
@@ -15,16 +16,10 @@ pub struct RoutingEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedRequest {
     #[serde(default)]
     pub model: String,
-    pub messages: Vec<Message>,
+    pub messages: Vec<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,6 +32,14 @@ pub struct NormalizedRequest {
     pub frequency_penalty: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presence_penalty: Option<f32>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -86,7 +86,7 @@ pub struct ProxyRouter {
     groq: GroqAdapter,
     anthropic: AnthropicAdapter,
     vault: Arc<VaultState>,
-    system_key: Arc<String>,
+    pub system_key: Arc<String>,
     circuit_breaker: CircuitBreaker,
     quota_map: QuotaMap,
     pub app_handle: Option<tauri::AppHandle>,
