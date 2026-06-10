@@ -18,7 +18,11 @@ export type Provider =
   | "xAI"
   | "DeepSeek"
   | "OpenRouter"
-  | "Cohere";
+  | "Cohere"
+  | "Cerebras"
+  | "Sambanova"
+  | "Cloudflare"
+  | "Github";
 
 /** Provider endpoint configuration. */
 export interface ProviderConfig {
@@ -30,7 +34,7 @@ export interface ProviderConfig {
 // ─── Chat Completion Types (OpenAI-compatible) ───────────────────────────────
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
+  role: "system" | "developer" | "user" | "assistant" | "tool";
   content: string | null;
   name?: string;
   tool_call_id?: string;
@@ -100,6 +104,23 @@ export interface ChatCompletionResponse {
   system_fingerprint?: string;
   /** The provider that actually served this request. */
   _keyking_provider?: string;
+}
+
+export interface ChatCompletionChunkChoice {
+  index: number;
+  delta: {
+    role?: "system" | "developer" | "user" | "assistant" | "tool";
+    content?: string | null;
+  };
+  finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;
+}
+
+export interface ChatCompletionChunk {
+  id: string;
+  object: "chat.completion.chunk";
+  created: number;
+  model: string;
+  choices: ChatCompletionChunkChoice[];
 }
 
 // ─── Anthropic-specific types (internal) ─────────────────────────────────────

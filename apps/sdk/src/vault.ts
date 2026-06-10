@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { VaultDecryptionError } from "./types.js";
 import type { VaultEntry } from "./types.js";
 
@@ -8,101 +7,93 @@ const NONCE_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 const PBKDF2_ITERATIONS = 100_000;
 const KEY_LENGTH = 32;
-const PBKDF2_DIGEST = "sha256";
-const CIPHER_ALGORITHM = "aes-256-gcm";
 
 /**
  * Decrypts a KeyKing vault string using the provided password.
- *
- * Wire format: "KK_VAULT_" + base64(salt[32] + nonce[12] + ciphertext + authTag[16])
- *
- * @param vaultString - The encrypted vault string exported from the KeyKing desktop app.
- * @param password    - The password used during vault encryption.
- * @returns An array of decrypted VaultEntry objects.
- * @throws {VaultDecryptionError} If the vault string is malformed or decryption fails.
+ * Uses Web Crypto API for serverless/edge compatibility.
  */
-export function decryptVault(vaultString: string, password: string): VaultEntry[] {
-  // ── Validate prefix ─────────────────────────────────────────────────────
+export async function decryptVault(vaultString: string, password: string): Promise<VaultEntry[]> {
   if (!vaultString.startsWith(VAULT_PREFIX)) {
-    throw new VaultDecryptionError(
-      `Invalid vault string: must start with "${VAULT_PREFIX}"`
-    );
+    throw new VaultDecryptionError(`Invalid vault string: must start with "${VAULT_PREFIX}"`);
   }
 
-  // ── Base64 decode ───────────────────────────────────────────────────────
   const base64Payload = vaultString.slice(VAULT_PREFIX.length);
-  let binaryData: Buffer;
+  let binaryData: Uint8Array;
 
   try {
-    binaryData = Buffer.from(base64Payload, "base64");
+    const binaryString = atob(base64Payload);
+    binaryData = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      binaryData[i] = binaryString.charCodeAt(i);
+    }
   } catch {
     throw new VaultDecryptionError("Invalid vault string: base64 decoding failed");
   }
 
-  // ── Validate minimum length ─────────────────────────────────────────────
-  const minLength = SALT_LENGTH + NONCE_LENGTH + AUTH_TAG_LENGTH + 1; // at least 1 byte of ciphertext
+  const minLength = SALT_LENGTH + NONCE_LENGTH + AUTH_TAG_LENGTH + 1;
   if (binaryData.length < minLength) {
-    throw new VaultDecryptionError(
-      `Invalid vault string: data too short (${binaryData.length} bytes, need at least ${minLength})`
-    );
+    throw new VaultDecryptionError(`Invalid vault string: data too short (${binaryData.length} bytes, need at least ${minLength})`);
   }
 
-  // ── Extract components ──────────────────────────────────────────────────
   const salt = binaryData.subarray(0, SALT_LENGTH);
   const nonce = binaryData.subarray(SALT_LENGTH, SALT_LENGTH + NONCE_LENGTH);
   const ciphertextWithTag = binaryData.subarray(SALT_LENGTH + NONCE_LENGTH);
 
-  // Rust's aes-gcm appends the 16-byte auth tag to the ciphertext
-  const ciphertext = ciphertextWithTag.subarray(0, ciphertextWithTag.length - AUTH_TAG_LENGTH);
-  const authTag = ciphertextWithTag.subarray(ciphertextWithTag.length - AUTH_TAG_LENGTH);
-
-  // ── Derive key with PBKDF2 ─────────────────────────────────────────────
-  let key: Buffer;
+  let key: CryptoKey;
   try {
-    key = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, PBKDF2_DIGEST);
-  } catch (err) {
-    throw new VaultDecryptionError(
-      `Key derivation failed: ${err instanceof Error ? err.message : String(err)}`
+    const enc = new TextEncoder();
+    const keyMaterial = await globalThis.crypto.subtle.importKey(
+      "raw",
+      enc.encode(password),
+      { name: "PBKDF2" },
+      false,
+      ["deriveKey"]
     );
+
+    key = await globalThis.crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: salt as any,
+        iterations: PBKDF2_ITERATIONS,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: KEY_LENGTH * 8 },
+      false,
+      ["decrypt"]
+    );
+  } catch (err) {
+    throw new VaultDecryptionError(`Key derivation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // ── Decrypt with AES-256-GCM ────────────────────────────────────────────
   let plaintext: string;
   try {
-    const decipher = crypto.createDecipheriv(CIPHER_ALGORITHM, key, nonce, {
-      authTagLength: AUTH_TAG_LENGTH,
-    });
-    decipher.setAuthTag(authTag);
-
-    const decrypted = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
-
-    plaintext = decrypted.toString("utf-8");
-  } catch (err) {
-    throw new VaultDecryptionError(
-      `Decryption failed — wrong password or corrupted vault. (${err instanceof Error ? err.message : String(err)})`
+    const decryptedBuffer = await globalThis.crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: nonce as any,
+        tagLength: AUTH_TAG_LENGTH * 8, // in bits
+      },
+      key,
+      ciphertextWithTag as any
     );
+
+    plaintext = new TextDecoder().decode(decryptedBuffer);
+  } catch (err) {
+    throw new VaultDecryptionError(`Decryption failed — wrong password or corrupted vault. (${err instanceof Error ? err.message : String(err)})`);
   }
 
-  // ── Parse JSON ──────────────────────────────────────────────────────────
   let entries: unknown;
   try {
     entries = JSON.parse(plaintext);
   } catch {
-    throw new VaultDecryptionError(
-      "Decrypted data is not valid JSON — vault may be corrupted"
-    );
+    throw new VaultDecryptionError("Decrypted data is not valid JSON — vault may be corrupted");
   }
 
   if (!Array.isArray(entries)) {
-    throw new VaultDecryptionError(
-      "Decrypted data is not a JSON array — unexpected vault format"
-    );
+    throw new VaultDecryptionError("Decrypted data is not a JSON array — unexpected vault format");
   }
 
-  // ── Validate entries ────────────────────────────────────────────────────
   const validated: VaultEntry[] = [];
   for (const entry of entries) {
     if (
@@ -111,9 +102,7 @@ export function decryptVault(vaultString: string, password: string): VaultEntry[
       typeof (entry as Record<string, unknown>).provider !== "string" ||
       typeof (entry as Record<string, unknown>).key !== "string"
     ) {
-      throw new VaultDecryptionError(
-        `Invalid vault entry: expected {provider: string, key: string}, got ${JSON.stringify(entry)}`
-      );
+      throw new VaultDecryptionError(`Invalid vault entry: expected {provider: string, key: string}, got ${JSON.stringify(entry)}`);
     }
     validated.push({
       provider: (entry as Record<string, unknown>).provider as string,

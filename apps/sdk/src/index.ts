@@ -5,6 +5,7 @@ import type {
   VaultEntry,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatCompletionChunk,
   Provider,
 } from "./types.js";
 import {
@@ -24,6 +25,8 @@ export type {
   ChatCompletionResponse,
   ChatMessage,
   ChatCompletionChoice,
+  ChatCompletionChunk,
+  ChatCompletionChunkChoice,
   CompletionUsage,
   Tool,
   ToolCall,
@@ -50,13 +53,13 @@ const DEFAULT_MAX_RETRIES = 3;
 // ─── Completions API ─────────────────────────────────────────────────────────
 
 class Completions {
-  private readonly getEntries: () => VaultEntry[];
+  private readonly getEntries: () => Promise<VaultEntry[]>;
   private readonly timeout: number;
   private readonly maxRetries: number;
   private readonly debug: boolean;
 
   constructor(
-    getEntries: () => VaultEntry[],
+    getEntries: () => Promise<VaultEntry[]>,
     timeout: number,
     maxRetries: number,
     debug: boolean
@@ -79,8 +82,10 @@ class Completions {
    * console.log(response.choices[0].message.content);
    * ```
    */
-  async create(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
-    const entries = this.getEntries();
+  async create(request: ChatCompletionRequest & { stream: true }): Promise<AsyncGenerator<ChatCompletionChunk, void, unknown>>;
+  async create(request: ChatCompletionRequest & { stream?: false | undefined }): Promise<ChatCompletionResponse>;
+  async create(request: ChatCompletionRequest): Promise<ChatCompletionResponse | AsyncGenerator<ChatCompletionChunk, void, unknown>> {
+    const entries = await this.getEntries();
 
     if (this.debug) {
       const providers = [...new Set(entries.map((e) => e.provider))];
@@ -103,7 +108,7 @@ class Chat {
   public readonly completions: Completions;
 
   constructor(
-    getEntries: () => VaultEntry[],
+    getEntries: () => Promise<VaultEntry[]>,
     timeout: number,
     maxRetries: number,
     debug: boolean
@@ -140,7 +145,7 @@ export class KeyKing {
   private readonly debug: boolean;
 
   /** Cached decrypted vault entries (lazy decryption). */
-  private cachedEntries: VaultEntry[] | null = null;
+  private cachedEntries: Promise<VaultEntry[]> | null = null;
 
   constructor(config: KeyKingConfig = {}) {
     const vault = config.vault ?? process.env.KEYKING_VAULT;
@@ -179,15 +184,17 @@ export class KeyKing {
    * Get decrypted vault entries, decrypting on first access.
    * Results are cached for subsequent calls.
    */
-  private getEntries(): VaultEntry[] {
+  private async getEntries(): Promise<VaultEntry[]> {
     if (this.cachedEntries === null) {
       if (this.debug) {
         console.error("[keyking] Decrypting vault...");
       }
-      this.cachedEntries = decryptVault(this.vaultString, this.password);
-      if (this.debug) {
-        console.error(`[keyking] Vault decrypted: ${this.cachedEntries.length} entries`);
-      }
+      this.cachedEntries = decryptVault(this.vaultString, this.password).then((entries) => {
+        if (this.debug) {
+          console.error(`[keyking] Vault decrypted: ${entries.length} entries`);
+        }
+        return entries;
+      });
     }
     return this.cachedEntries;
   }
@@ -195,16 +202,17 @@ export class KeyKing {
   /**
    * Get the list of providers available in the vault.
    */
-  get providers(): Provider[] {
-    const entries = this.getEntries();
+  async getProviders(): Promise<Provider[]> {
+    const entries = await this.getEntries();
     return [...new Set(entries.map((e) => e.provider))] as Provider[];
   }
 
   /**
    * Check if the vault contains a key for the given provider.
    */
-  hasProvider(provider: Provider): boolean {
-    return this.getEntries().some((e) => e.provider === provider);
+  async hasProvider(provider: Provider): Promise<boolean> {
+    const entries = await this.getEntries();
+    return entries.some((e) => e.provider === provider);
   }
 
   /**

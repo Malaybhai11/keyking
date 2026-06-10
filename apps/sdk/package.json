@@ -1,6 +1,6 @@
 {
   "name": "keyking-sdk",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "description": "Zero-Trust Serverless SDK for KeyKing — Route LLM API calls with automatic failover, no proxy needed.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
