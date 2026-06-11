@@ -55,32 +55,41 @@ function AppCallbackInner() {
       return;
     }
 
-    // Fetch session from better-auth using the browser's cookie (this is the key fix)
-    authClient.getSession().then(({ data: session, error }) => {
-      if (error || !session?.user) {
+    // Fetch session manually via our custom robust endpoint to bypass better-auth Vercel edge cases
+    fetch("/api/auth/fetch-session")
+      .then(res => res.json())
+      .then((data) => {
+        if (data.error || !data.session || !data.user) {
+          console.error("Auth callback failed:", data.error || data.details);
+          setStatus("failed");
+          return;
+        }
+
+        const session = data; // structure matches { session, user }
+
+        if (posthog) {
+          posthog.identify(session.user.id, {
+            email: session.user.email,
+            name: session.user.name,
+          });
+          posthog.capture("User Logged In", {
+            email: session.user.email,
+          });
+        }
+
+        // Session is valid — build the localhost redirect URL and send the user to the desktop app
+        const callbackUrl = new URL("http://localhost:8787/auth/callback");
+        callbackUrl.searchParams.set("session_id", session.session.token);
+        callbackUrl.searchParams.set("user_id", session.user.id);
+        callbackUrl.searchParams.set("email", session.user.email);
+
+        // Hard redirect to the desktop proxy — this is what delivers the auth to the app
+        window.location.href = callbackUrl.toString();
+      })
+      .catch((err) => {
+        console.error("Auth callback fetch error:", err);
         setStatus("failed");
-        return;
-      }
-
-      if (posthog) {
-        posthog.identify(session.user.id, {
-          email: session.user.email,
-          name: session.user.name,
-        });
-        posthog.capture("User Logged In", {
-          email: session.user.email,
-        });
-      }
-
-      // Session is valid — build the localhost redirect URL and send the user to the desktop app
-      const callbackUrl = new URL("http://localhost:8787/auth/callback");
-      callbackUrl.searchParams.set("session_id", session.session.token);
-      callbackUrl.searchParams.set("user_id", session.user.id);
-      callbackUrl.searchParams.set("email", session.user.email);
-
-      // Hard redirect to the desktop proxy — this is what delivers the auth to the app
-      window.location.href = callbackUrl.toString();
-    });
+      });
   }, [appVersion, posthog]);
 
   if (status === "blocked") return <VersionBlockedPage />;
