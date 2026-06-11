@@ -228,7 +228,7 @@ pub async fn handle_anthropic_messages(
     }
 
     // For streaming, use the raw stream to bypass axum SSE double-wrapping
-    let response = match router.get_raw_stream(&normalized).await {
+    let (response, event_id) = match router.get_raw_stream(&normalized).await {
         Ok(r) => r,
         Err(e) => return (StatusCode::BAD_GATEWAY, format!("Routing failed: {}", e)).into_response(),
     };
@@ -236,6 +236,7 @@ pub async fn handle_anthropic_messages(
     let mut byte_stream = response.bytes_stream();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     
+    let router_clone = router.clone();
     tokio::spawn(async move {
         let msg_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..24].to_string());
         
@@ -276,6 +277,7 @@ pub async fn handle_anthropic_messages(
         let mut active_indices: Vec<u64> = vec![0]; // ordered list of active block indices
         let mut final_stop_reason = "end_turn".to_string();
         let mut output_tokens: u64 = 0;
+        let mut input_tokens: u64 = 0;
         let mut tool_arg_buffers: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
         
         // Helper: extract data payload from potentially multi-line and double-wrapped SSE event
@@ -341,6 +343,9 @@ pub async fn handle_anthropic_messages(
                 if let Some(usage) = json.get("usage") {
                     if let Some(ct) = usage.get("completion_tokens").and_then(|t| t.as_u64()) {
                         output_tokens = ct;
+                    }
+                    if let Some(pt) = usage.get("prompt_tokens").and_then(|t| t.as_u64()) {
+                        input_tokens = pt;
                     }
                 }
                 
@@ -476,6 +481,9 @@ pub async fn handle_anthropic_messages(
         let _ = tx.send(Event::default().event("message_stop").data(json!({
             "type": "message_stop"
         }).to_string()));
+        
+        // Update the proxy router log with final token count
+        router_clone.update_event_tokens(&event_id, (input_tokens + output_tokens) as u32);
     });
     
     Sse::new(futures::stream::unfold(rx, |mut rx| async move {

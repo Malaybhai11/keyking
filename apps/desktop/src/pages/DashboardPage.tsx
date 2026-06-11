@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Activity, Key, Zap, AlertTriangle, Copy, Check, Eye, EyeOff, Terminal } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { useEvents } from '../App'
+import { useEvents, formatTokens } from '../App'
 
 export default function DashboardPage() {
   const [keyCount, setKeyCount] = useState(0)
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const stats = [
     { label: 'Active Keys', value: String(keyCount), icon: Key, bg: 'bg-neo-cyan' },
     { label: 'Requests Today', value: String(successCount), icon: Activity, bg: 'bg-neo-green' },
-    { label: 'Tokens Used', value: totalTokens > 0 ? totalTokens.toLocaleString() : '-', icon: Zap, bg: 'bg-neo-yellow' },
+    { label: 'Tokens Used', value: totalTokens > 0 ? formatTokens(totalTokens) : '-', icon: Zap, bg: 'bg-neo-yellow' },
     { label: 'Anomalies', value: '0', icon: AlertTriangle, bg: 'bg-neo-pink' },
   ]
 

@@ -24,6 +24,13 @@ export interface RoutingEvent {
   error_msg?: string
 }
 
+export function formatTokens(tokens: number): string {
+  if (tokens >= 100000) {
+    return (tokens / 1000000).toFixed(1) + 'M'
+  }
+  return tokens.toLocaleString()
+}
+
 interface EventContextValue {
   events: RoutingEvent[]
   addEvent: (e: RoutingEvent) => void
@@ -54,7 +61,15 @@ function EventProvider({ children }: { children: ReactNode }) {
     const unlisten = listen<RoutingEvent>('routing-event', (event) => {
       setEvents(prev => [event.payload, ...prev].slice(0, maxEvents))
     })
-    return () => { unlisten.then(fn => fn()) }
+    
+    const unlistenUpdate = listen<{id: string, tokens_used: number}>('routing-event-update', (event) => {
+      setEvents(prev => prev.map(e => e.id === event.payload.id ? { ...e, tokens_used: event.payload.tokens_used } : e))
+    })
+    
+    return () => { 
+      unlisten.then(fn => fn())
+      unlistenUpdate.then(fn => fn())
+    }
   }, [])
 
   const addEvent = (e: RoutingEvent) => setEvents(prev => [e, ...prev].slice(0, maxEvents))

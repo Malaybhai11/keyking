@@ -175,6 +175,37 @@ impl ProxyRouter {
         });
     }
 
+    pub fn update_event_tokens(&self, event_id: &str, tokens: u32) {
+        if let Some(ref handle) = self.app_handle {
+            handle.emit("routing-event-update", serde_json::json!({
+                "id": event_id,
+                "tokens_used": tokens
+            })).ok();
+        }
+        
+        let vault_state = self.vault.clone();
+        let id_clone = event_id.to_string();
+        tauri::async_runtime::spawn(async move {
+            let vault = vault_state.vault.lock().await;
+            let path = vault.data_dir.join("routing_log.json");
+            if path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(mut logs) = serde_json::from_str::<Vec<RoutingEvent>>(&content) {
+                        for log in logs.iter_mut() {
+                            if log.id == id_clone {
+                                log.tokens_used = tokens;
+                                break;
+                            }
+                        }
+                        if let Ok(json) = serde_json::to_string_pretty(&logs) {
+                            let _ = std::fs::write(&path, json);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     async fn try_key(
         &self,
         key_entry: &crate::vault::StoredKeyEntry,
@@ -427,7 +458,7 @@ impl ProxyRouter {
     pub async fn get_raw_stream(
         &self,
         req: &NormalizedRequest,
-    ) -> Result<reqwest::Response, String> {
+    ) -> Result<(reqwest::Response, String), String> {
         let start = std::time::Instant::now();
 
         let rules_path = self.vault.vault.lock().await.data_dir.join("routing_rules.json");
@@ -531,9 +562,10 @@ impl ProxyRouter {
                 self.update_quota_from_headers(&key_entry.id, provider, upstream.headers()).await;
                 let latency = start.elapsed().as_millis() as u64;
                 self.circuit_breaker.record_success(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: latency, tokens_used: 0, success: true, error_msg: None });
+                let event_id = Uuid::new_v4().to_string();
+                self.emit_event(RoutingEvent { id: event_id.clone(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: latency, tokens_used: 0, success: true, error_msg: None });
 
-                return Ok(upstream);
+                return Ok((upstream, event_id));
             }
         }
 

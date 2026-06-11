@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Filter, Trash2, Activity, Clock, X, Info } from 'lucide-react'
-import { useEvents } from '../App'
+import { useEvents, formatTokens } from '../App'
 
 export default function RoutingLogPage() {
   const { events, clearEvents } = useEvents()
@@ -92,7 +92,7 @@ export default function RoutingLogPage() {
                   </div>
                 </td>
                 <td className="py-4 px-6 text-neo-dark font-black text-lg">
-                  {event.tokens_used.toLocaleString()}
+                  {formatTokens(event.tokens_used)}
                 </td>
                 <td className="py-4 px-6 text-right">
                   <div className="flex items-center justify-end gap-3">
