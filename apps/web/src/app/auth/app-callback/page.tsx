@@ -84,7 +84,7 @@ export default async function AppCallback({ searchParams }: Props) {
 
   // Version is valid — redirect to the local proxy's auth callback with session details
   const callbackUrl = new URL("http://localhost:8787/auth/callback");
-  callbackUrl.searchParams.set("session_id", session.session.id);
+  callbackUrl.searchParams.set("session_id", session.session.token);
   callbackUrl.searchParams.set("user_id", session.user.id);
   callbackUrl.searchParams.set("email", session.user.email);
   
