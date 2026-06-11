@@ -7,6 +7,8 @@ const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export const auth = betterAuth({
+    baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "https://keyking.ledgion.in",
+    trustedOrigins: ["http://localhost:8787", "https://keyking.ledgion.in"],
     database: prismaAdapter(prisma, {
         provider: "postgresql",
     }),
