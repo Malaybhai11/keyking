@@ -10,7 +10,37 @@ permissions:
   contents: write # Required to create releases and upload assets
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create-release.outputs.id }}
+    steps:
+      - name: Create Release
+        id: create-release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "KeyKing ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## KeyKing Desktop ${{ github.ref_name }}
+
+            ### Installation
+
+            **One-line install (Linux/macOS):**
+            ```bash
+            curl -fsSL https://keyking.ledgion.in/install.sh | bash
+            ```
+
+            **Or download the installer for your platform below.**
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-tauri:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -71,21 +101,7 @@ jobs:
         with:
           projectPath: 'apps/desktop'
           tauriScript: 'npm run tauri'
-          tagName: v__VERSION__
-          releaseName: "KeyKing v__VERSION__"
-          releaseBody: |
-            ## KeyKing Desktop v__VERSION__
-
-            ### Installation
-
-            **One-line install (Linux/macOS):**
-            ```bash
-            curl -fsSL https://keyking.ledgion.in/install.sh | bash
-            ```
-
-            **Or download the installer for your platform below.**
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
       # After tauri-action, also upload a simple tar.gz/zip that matches install.sh naming
