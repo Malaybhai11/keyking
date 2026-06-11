@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { ShieldCheck, LogIn, Loader2, ShieldAlert } from "lucide-react";
 import semver from "semver";
+import { usePostHog } from 'posthog-js/react'
 
 const MIN_FALLBACK_VERSION = "3.0.0";
 
@@ -13,6 +14,7 @@ function AppLoginInner() {
   const [blocked, setBlocked] = useState(false);
   const searchParams = useSearchParams();
   const appVersion = searchParams.get("app_version");
+  const posthog = usePostHog()
 
   useEffect(() => {
     // No version param = old app (v2.x.x) that never sends it → block
@@ -25,6 +27,9 @@ function AppLoginInner() {
 
   const handleLogin = async () => {
     setLoading(true);
+    if (posthog) {
+      posthog.capture("login_clicked", { provider: "google", context: "app-login" })
+    }
     await authClient.signIn.social({
       provider: "google",
       callbackURL: `/auth/app-callback${appVersion ? `?app_version=${appVersion}` : ""}`,

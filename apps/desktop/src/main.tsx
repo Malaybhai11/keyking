@@ -11,7 +11,7 @@ if (posthogKey) {
   posthog.init(posthogKey, {
     api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://t.keyking.ledgion.in',
     ui_host: 'https://us.posthog.com',
-    defaults: '2026-05-30',
+    persistence: 'localStorage',
     person_profiles: 'identified_only',
     autocapture: true,
     session_recording: {

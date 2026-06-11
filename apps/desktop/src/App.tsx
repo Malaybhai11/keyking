@@ -90,6 +90,7 @@ function EventProvider({ children }: { children: ReactNode }) {
 function Sidebar() {
   const { events } = useEvents()
   const recent = events.filter(e => e.success).length
+  const posthog = usePostHog()
 
   return (
     <aside className="w-[280px] bg-neo-bg border-r-3 border-neo-dark flex flex-col z-10 relative">
@@ -109,12 +110,12 @@ function Sidebar() {
         <NavLink to="/keys" data-tour="tour-step-1" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
-          <Key className="w-5 h-5" /> API Keys
+          <Key className="w-5 h-5" /> Provider Keys
         </NavLink>
-        <NavLink to="/routing-log" data-tour="tour-step-7" className={({isActive}) =>
+        <NavLink to="/logs" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
-          <Activity className="w-5 h-5" /> Routing Log
+          <Activity className="w-5 h-5" /> Routing Logs
         </NavLink>
         <NavLink to="/priority" data-tour="tour-step-5" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
@@ -136,6 +137,7 @@ function Sidebar() {
           <button onClick={async () => {
               localStorage.removeItem('auth_session')
               try { await invoke('clear_session') } catch (e) { console.error(e) }
+              if (posthog) posthog.reset()
               window.location.reload()
             }} 
             className="w-full flex items-center gap-3 px-4 py-3 border-3 border-transparent transition-all duration-200 text-neo-dark hover:bg-neo-pink hover:text-white hover:border-neo-dark hover:shadow-neo-sm cursor-pointer"
@@ -316,7 +318,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/keys" element={<KeysPage />} />
-                <Route path="/routing-log" element={<RoutingLogPage />} />
+                <Route path="/logs" element={<RoutingLogPage />} />
                 <Route path="/priority" element={<RoutingRulesPage />} />
                 <Route path="/anomalies" element={<AnomaliesPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

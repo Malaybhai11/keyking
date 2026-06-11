@@ -88,5 +88,24 @@ export default async function AppCallback({ searchParams }: Props) {
   callbackUrl.searchParams.set("user_id", session.user.id);
   callbackUrl.searchParams.set("email", session.user.email);
   
+  // Track user login in PostHog server-side before redirect
+  phClient.identify({
+    distinctId: session.user.id,
+    properties: {
+      email: session.user.email,
+      name: session.user.name,
+    }
+  });
+
+  phClient.capture({
+    distinctId: session.user.id,
+    event: 'User Logged In',
+    properties: {
+      email: session.user.email,
+    }
+  });
+
+  await phClient.flush();
+  
   redirect(callbackUrl.toString());
 }
