@@ -31,7 +31,11 @@ fn extract_bearer(headers: &HeaderMap) -> Option<&str> {
 
 fn model_to_provider(model: &str) -> &'static str {
     let l = model.to_lowercase();
-    if l.contains("gpt") || l.contains("o1") || l.contains("o3") || l.contains("davinci") {
+    if l.contains("gpt-5") || l.contains("zen") {
+        "OpencodeZen"
+    } else if l.contains("nvidia") || l.contains("nim") {
+        "Nvidia"
+    } else if l.contains("gpt") || l.contains("o1") || l.contains("o3") || l.contains("davinci") {
         "OpenAI"
     } else if l.contains("llama") || l.contains("groq") || l.contains("mixtral") || l.contains("gemma") {
         "Groq"
@@ -76,6 +80,8 @@ fn provider_url(provider: &str) -> &'static str {
         "Sambanova" => "https://api.sambanova.ai/v1",
         "Github" => "https://models.inference.ai.azure.com",
         "Cloudflare" => "https://api.cloudflare.com/client/v4/accounts/default/ai/v1",
+        "Nvidia" => "https://integrate.api.nvidia.com/v1",
+        "OpencodeZen" => "https://opencode.ai/zen/v1",
         _ => "https://api.openai.com/v1/chat/completions",
     }
 }
@@ -416,6 +422,124 @@ impl ProxyRouter {
         Err("All keys failed".to_string())
     }
 
+    /// Returns the raw upstream reqwest::Response for streaming requests.
+    /// Used by the Anthropic proxy handler to bypass the SSE double-wrapping issue.
+    pub async fn get_raw_stream(
+        &self,
+        req: &NormalizedRequest,
+    ) -> Result<reqwest::Response, String> {
+        let start = std::time::Instant::now();
+
+        let rules_path = self.vault.vault.lock().await.data_dir.join("routing_rules.json");
+        let mut custom_rules: Vec<crate::commands::RoutingRule> = vec![];
+        if rules_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&rules_path) {
+                custom_rules = serde_json::from_str(&content).unwrap_or_default();
+            }
+        }
+
+        let providers_to_try: Vec<(String, String)> = if !custom_rules.is_empty() {
+            custom_rules.iter().map(|r| (r.provider.clone(), r.model.clone())).collect()
+        } else {
+            let primary = model_to_provider(&req.model);
+            let all = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen"];
+            let mut list = vec![(primary.to_string(), req.model.clone())];
+            for &p in &all {
+                if p != primary {
+                    list.push((p.to_string(), req.model.clone()));
+                }
+            }
+            list
+        };
+
+        for (provider, model) in &providers_to_try {
+            let keys = {
+                let vault = self.vault.vault.lock().await;
+                vault.keys_by_provider(provider)
+            };
+            let valid_keys: Vec<_> = keys.iter().filter(|k| k.is_valid).collect();
+            if valid_keys.is_empty() { continue; }
+
+            for key_entry in &valid_keys {
+                if !self.circuit_breaker.is_available(&key_entry.id).await { continue; }
+
+                let plaintext = {
+                    let vault = self.vault.vault.lock().await;
+                    match vault.get_plaintext_key(&key_entry.id) {
+                        Some(Ok(k)) => k,
+                        _ => continue,
+                    }
+                };
+
+                let base_url = provider_url(provider);
+                let url = if base_url.ends_with("/chat/completions") {
+                    base_url.to_string()
+                } else {
+                    format!("{}/chat/completions", base_url)
+                };
+
+                let effective_model = if provider == "Groq" {
+                    map_groq_model(model).to_string()
+                } else {
+                    model.clone()
+                };
+
+                let mut stream_req = serde_json::json!({
+                    "model": effective_model,
+                    "messages": req.messages,
+                    "stream": true,
+                    "temperature": req.temperature,
+                    "max_tokens": req.max_tokens,
+                    "top_p": req.top_p,
+                    "frequency_penalty": req.frequency_penalty,
+                    "presence_penalty": req.presence_penalty,
+                });
+
+                if let Some(obj) = stream_req.as_object_mut() {
+                    for (k, v) in &req.extra {
+                        if provider == "Groq" && k == "tool_choice" && v == "required" {
+                            obj.insert(k.clone(), serde_json::json!("auto"));
+                        } else {
+                            obj.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+
+                let upstream = match self.client.post(&url)
+                    .header("Authorization", format!("Bearer {}", plaintext))
+                    .header("Content-Type", "application/json")
+                    .header("HTTP-Referer", "https://keyking.ledgion.in")
+                    .header("X-Title", "KeyKing")
+                    .json(&stream_req)
+                    .send().await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        self.circuit_breaker.record_failure(&key_entry.id).await;
+                        self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(e.to_string()) });
+                        continue;
+                    }
+                };
+
+                let status = upstream.status().as_u16();
+                if status == 401 || status == 429 || !upstream.status().is_success() {
+                    self.circuit_breaker.record_failure(&key_entry.id).await;
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
+                    continue;
+                }
+
+                self.update_quota_from_headers(&key_entry.id, provider, upstream.headers()).await;
+                let latency = start.elapsed().as_millis() as u64;
+                self.circuit_breaker.record_success(&key_entry.id).await;
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: latency, tokens_used: 0, success: true, error_msg: None });
+
+                return Ok(upstream);
+            }
+        }
+
+        Err("All providers/keys exhausted".to_string())
+    }
+
     pub async fn handle_chat(
         State(router): State<Arc<Self>>,
         headers: HeaderMap,
@@ -456,7 +580,7 @@ impl ProxyRouter {
             }
 
             // Fallback: try all other providers that have keys
-            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github"];
+            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen"];
             for &provider in &all_providers {
                 if provider == primary_provider {
                     continue;

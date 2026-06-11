@@ -47,6 +47,18 @@ async fn check_key(provider: &str, key: &str) -> Result<bool, String> {
                 .send().await.map_err(|e| e.to_string())?;
             Ok(resp.status().is_success())
         }
+        "Nvidia" => {
+            let resp = client.get("https://integrate.api.nvidia.com/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "OpencodeZen" => {
+            let resp = client.get("https://opencode.ai/zen/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
         _ => Ok(true)
     }
 }
@@ -164,6 +176,8 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             "Mistral" => Some("https://api.mistral.ai/v1/models"),
             "xAI" => Some("https://api.x.ai/v1/models"),
             "DeepSeek" => Some("https://api.deepseek.com/models"),
+            "Nvidia" => Some("https://integrate.api.nvidia.com/v1/models"),
+            "OpencodeZen" => Some("https://opencode.ai/zen/v1/models"),
             _ => None,
         };
 

@@ -73,6 +73,14 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     baseUrl: "https://models.inference.ai.azure.com/chat/completions",
     openaiCompatible: true,
   },
+  Nvidia: {
+    baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
+    openaiCompatible: true,
+  },
+  OpencodeZen: {
+    baseUrl: "https://opencode.ai/zen/v1/chat/completions",
+    openaiCompatible: true,
+  },
 };
 
 // ─── Model → Provider Mapping ────────────────────────────────────────────────
@@ -94,6 +102,10 @@ const MODEL_PREFIX_MAP: [string, Provider][] = [
   ["deepseek", "DeepSeek"],
   ["command", "Cohere"],
   ["cohere", "Cohere"],
+  ["nvidia", "Nvidia"],
+  ["nim", "Nvidia"],
+  ["zen", "OpencodeZen"],
+  ["gpt-5", "OpencodeZen"],
 ];
 
 export function resolveProvider(model: string): Provider | null {
@@ -141,7 +153,7 @@ function mapToAnthropicModel(model: string): string | null {
 function getFallbackProviders(primary: Provider): Provider[] {
   const allProviders: Provider[] = [
     "OpenAI", "Groq", "Anthropic", "Gemini", "Mistral",
-    "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github"
+    "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen"
   ];
   
   const fallbacks: Provider[] = [];

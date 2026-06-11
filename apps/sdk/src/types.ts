@@ -22,7 +22,9 @@ export type Provider =
   | "Cerebras"
   | "Sambanova"
   | "Cloudflare"
-  | "Github";
+  | "Github"
+  | "Nvidia"
+  | "OpencodeZen";
 
 /** Provider endpoint configuration. */
 export interface ProviderConfig {

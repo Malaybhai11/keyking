@@ -52,7 +52,10 @@ pub async fn handle_anthropic_messages(
                             text_content.push_str(t);
                         }
                     } else if ctype == "tool_use" {
-                        let id = item.get("id").cloned().unwrap_or_default();
+                        let mut id = item.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+                        if id.starts_with("toolu_call_") {
+                            id = id.replace("toolu_", "");
+                        }
                         let name = item.get("name").cloned().unwrap_or_default();
                         let input = item.get("input").cloned().unwrap_or(json!({}));
                         tool_calls.push(json!({
@@ -65,7 +68,10 @@ pub async fn handle_anthropic_messages(
                         }));
                     } else if ctype == "tool_result" {
                         is_tool_result = true;
-                        let tool_use_id = item.get("tool_use_id").cloned().unwrap_or_default();
+                        let mut tool_use_id = item.get("tool_use_id").and_then(|t| t.as_str()).unwrap_or("").to_string();
+                        if tool_use_id.starts_with("toolu_call_") {
+                            tool_use_id = tool_use_id.replace("toolu_", "");
+                        }
                         let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
                         messages.push(json!({
                             "role": "tool",
@@ -153,26 +159,27 @@ pub async fn handle_anthropic_messages(
         }
     }
 
-    let client = reqwest::Client::new();
-    let self_url = "http://127.0.0.1:8787/v1/chat/completions";
-    let system_key = router.system_key.as_str();
-    
-    let mut upstream_req = client.post(self_url)
-        .header("Authorization", format!("Bearer {}", system_key))
-        .json(&normalized);
-        
-    let response = match upstream_req.send().await {
-        Ok(res) => res,
-        Err(e) => return (StatusCode::BAD_GATEWAY, format!("Failed internal proxy: {}", e)).into_response(),
-    };
-    
-    if !response.status().is_success() {
-        let status = response.status();
-        let text = response.text().await.unwrap_or_default();
-        return (status, text).into_response();
-    }
-    
     if !stream {
+        // Make a non-streaming request via the internal endpoint
+        let client = reqwest::Client::new();
+        let self_url = "http://127.0.0.1:8787/v1/chat/completions";
+        let system_key = router.system_key.as_str();
+        
+        let response = match client.post(self_url)
+            .header("Authorization", format!("Bearer {}", system_key))
+            .json(&normalized)
+            .send().await
+        {
+            Ok(res) => res,
+            Err(e) => return (StatusCode::BAD_GATEWAY, format!("Failed internal proxy: {}", e)).into_response(),
+        };
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return (status, text).into_response();
+        }
+        
         let openai_resp: serde_json::Value = response.json().await.unwrap_or_else(|_| json!({}));
         let content = openai_resp["choices"][0]["message"]["content"].as_str().unwrap_or("");
         
@@ -186,7 +193,12 @@ pub async fn handle_anthropic_messages(
         
         if let Some(tool_calls) = openai_resp["choices"][0]["message"].get("tool_calls").and_then(|t| t.as_array()) {
             for tc in tool_calls {
-                let id = tc.get("id").cloned().unwrap_or_default();
+                let raw_id = tc.get("id").and_then(|i| i.as_str()).unwrap_or("");
+                let id = if raw_id.starts_with("toolu_") {
+                    raw_id.to_string()
+                } else {
+                    format!("toolu_{}", raw_id)
+                };
                 let name = tc["function"].get("name").cloned().unwrap_or_default();
                 let args_str = tc["function"].get("arguments").and_then(|a| a.as_str()).unwrap_or("{}");
                 let args_json: serde_json::Value = serde_json::from_str(args_str).unwrap_or(json!({}));
@@ -215,22 +227,43 @@ pub async fn handle_anthropic_messages(
         return axum::Json(anthropic_resp).into_response();
     }
 
+    // For streaming, use the raw stream to bypass axum SSE double-wrapping
+    let response = match router.get_raw_stream(&normalized).await {
+        Ok(r) => r,
+        Err(e) => return (StatusCode::BAD_GATEWAY, format!("Routing failed: {}", e)).into_response(),
+    };
+    
     let mut byte_stream = response.bytes_stream();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     
     tokio::spawn(async move {
-        let _ = tx.send(Event::default().data(json!({
+        let msg_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..24].to_string());
+        
+        // message_start
+        let _ = tx.send(Event::default().event("message_start").data(json!({
             "type": "message_start",
             "message": {
-                "id": format!("msg_{}", uuid::Uuid::new_v4()),
+                "id": msg_id,
                 "type": "message",
                 "role": "assistant",
                 "model": original_model,
-                "content": []
+                "content": [],
+                "stop_reason": null,
+                "stop_sequence": null,
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 0
+                }
             }
         }).to_string()));
         
-        let _ = tx.send(Event::default().data(json!({
+        // Send ping to keep alive
+        let _ = tx.send(Event::default().event("ping").data(json!({"type": "ping"}).to_string()));
+        
+        // content_block_start for text block (index 0)
+        let _ = tx.send(Event::default().event("content_block_start").data(json!({
             "type": "content_block_start",
             "index": 0,
             "content_block": {
@@ -240,74 +273,178 @@ pub async fn handle_anthropic_messages(
         }).to_string()));
 
         let mut buffer = String::new();
-        let mut active_indices = std::collections::HashSet::new();
-        active_indices.insert(0);
+        let mut active_indices: Vec<u64> = vec![0]; // ordered list of active block indices
+        let mut final_stop_reason = "end_turn".to_string();
+        let mut output_tokens: u64 = 0;
+        let mut tool_arg_buffers: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
         
-        while let Some(Ok(chunk)) = byte_stream.next().await {
+        // Helper: extract data payload from potentially multi-line and double-wrapped SSE event
+        // The internal /v1/chat/completions endpoint wraps upstream SSE chunks in another Event,
+        // so we may get "data: data: {...}" or even "data: event: ...\ndata: data: {...}"
+        fn extract_data_line(event_str: &str) -> Option<String> {
+            for line in event_str.lines() {
+                let mut trimmed = line.trim();
+                // Strip all leading "data:" or "data: " prefixes (handles double-wrapping)
+                loop {
+                    if trimmed.starts_with("data: ") {
+                        trimmed = &trimmed[6..];
+                    } else if trimmed.starts_with("data:") {
+                        trimmed = &trimmed[5..];
+                    } else {
+                        break;
+                    }
+                }
+                // After stripping, we should have either JSON, "[DONE]", or something to skip
+                let trimmed = trimmed.trim();
+                if trimmed.is_empty() || trimmed.starts_with("event:") {
+                    continue;
+                }
+                return Some(trimmed.to_string());
+            }
+            None
+        }
+        
+        while let Some(chunk_result) = byte_stream.next().await {
+            let chunk = match chunk_result {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[keyking:anthropic] Stream read error: {}", e);
+                    break;
+                }
+            };
             buffer.push_str(&String::from_utf8_lossy(&chunk));
             
+            // Process all complete SSE events (separated by \n\n)
             while let Some(pos) = buffer.find("\n\n") {
                 let event_str = buffer[..pos].to_string();
                 buffer = buffer[pos+2..].to_string();
                 
-                let line = event_str.trim();
-                if line.starts_with("data: ") {
-                    let data = &line[6..];
-                    if data == "[DONE]" {
+                // Extract the data line from potentially multi-line SSE
+                let data = match extract_data_line(&event_str) {
+                    Some(d) => d,
+                    None => continue,
+                };
+                
+                if data == "[DONE]" {
+                    continue;
+                }
+                
+                let json: serde_json::Value = match serde_json::from_str(&data) {
+                    Ok(j) => j,
+                    Err(e) => {
+                        eprintln!("[keyking:anthropic] JSON parse error: {} for data: {}", e, &data[..data.len().min(200)]);
                         continue;
                     }
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
-                        if let Some(choices) = json.get("choices").and_then(|c| c.as_array()) {
-                            if let Some(delta) = choices.get(0).and_then(|c| c.get("delta")) {
-                                if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
-                                    if !content.is_empty() {
-                                        let _ = tx.send(Event::default().data(json!({
-                                            "type": "content_block_delta",
-                                            "index": 0,
-                                            "delta": {
-                                                "type": "text_delta",
-                                                "text": content
-                                            }
-                                        }).to_string()));
-                                    }
+                };
+                
+                // Track usage if present
+                if let Some(usage) = json.get("usage") {
+                    if let Some(ct) = usage.get("completion_tokens").and_then(|t| t.as_u64()) {
+                        output_tokens = ct;
+                    }
+                }
+                
+                let choices = match json.get("choices").and_then(|c| c.as_array()) {
+                    Some(c) => c.clone(),
+                    None => continue,
+                };
+                
+                let choice = match choices.get(0) {
+                    Some(c) => c.clone(),
+                    None => continue,
+                };
+                
+                // Track finish_reason
+                if let Some(fr) = choice.get("finish_reason").and_then(|f| f.as_str()) {
+                    final_stop_reason = match fr {
+                        "tool_calls" => "tool_use".to_string(),
+                        "stop" => "end_turn".to_string(),
+                        "length" => "max_tokens".to_string(),
+                        other => other.to_string(),
+                    };
+                }
+                
+                let delta = match choice.get("delta") {
+                    Some(d) => d.clone(),
+                    None => continue,
+                };
+                
+                // Handle text content
+                if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
+                    if !content.is_empty() {
+                        output_tokens += 1; // rough estimate
+                        let _ = tx.send(Event::default().event("content_block_delta").data(json!({
+                            "type": "content_block_delta",
+                            "index": 0,
+                            "delta": {
+                                "type": "text_delta",
+                                "text": content
+                            }
+                        }).to_string()));
+                    }
+                }
+                
+                // Handle tool calls
+                if let Some(tool_calls) = delta.get("tool_calls").and_then(|t| t.as_array()) {
+                    for tc in tool_calls {
+                        let tc_index = tc.get("index").and_then(|i| i.as_u64()).unwrap_or(0);
+                        let block_index = tc_index + 1; // text is index 0, tools start at 1
+                        
+                        // If this tool call has an "id", it's the START of a new tool call
+                        if let Some(raw_id) = tc.get("id").and_then(|i| i.as_str()) {
+                            // Normalize to Anthropic-style toolu_ prefix
+                            let tool_id = if raw_id.starts_with("toolu_") {
+                                raw_id.to_string()
+                            } else {
+                                format!("toolu_{}", raw_id)
+                            };
+                            
+                            // Close the previous block before opening a new one
+                            if let Some(&last_idx) = active_indices.last() {
+                                let _ = tx.send(Event::default().event("content_block_stop").data(json!({
+                                    "type": "content_block_stop",
+                                    "index": last_idx
+                                }).to_string()));
+                            }
+                            
+                            // Track this new block
+                            active_indices.push(block_index);
+                            tool_arg_buffers.insert(block_index, String::new());
+                            
+                            let name = tc.get("function")
+                                .and_then(|f| f.get("name"))
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("");
+                            
+                            let _ = tx.send(Event::default().event("content_block_start").data(json!({
+                                "type": "content_block_start",
+                                "index": block_index,
+                                "content_block": {
+                                    "type": "tool_use",
+                                    "id": tool_id,
+                                    "name": name,
+                                    "input": {}
                                 }
-                                
-                                if let Some(tool_calls) = delta.get("tool_calls").and_then(|t| t.as_array()) {
-                                    for tc in tool_calls {
-                                        let index = tc.get("index").and_then(|i| i.as_u64()).unwrap_or(0) + 1;
-                                        active_indices.insert(index);
-                                        
-                                        if let Some(id) = tc.get("id").and_then(|i| i.as_str()) {
-                                            if let Some(function) = tc.get("function") {
-                                                let name = function.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                                                let _ = tx.send(Event::default().data(json!({
-                                                    "type": "content_block_start",
-                                                    "index": index,
-                                                    "content_block": {
-                                                        "type": "tool_use",
-                                                        "id": id,
-                                                        "name": name,
-                                                        "input": {}
-                                                    }
-                                                }).to_string()));
-                                            }
-                                        }
-                                        if let Some(function) = tc.get("function") {
-                                            if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
-                                                if !args.is_empty() {
-                                                    let _ = tx.send(Event::default().data(json!({
-                                                        "type": "content_block_delta",
-                                                        "index": index,
-                                                        "delta": {
-                                                            "type": "input_json_delta",
-                                                            "partial_json": args
-                                                        }
-                                                    }).to_string()));
-                                                }
-                                            }
-                                        }
-                                    }
+                            }).to_string()));
+                        }
+                        
+                        // Stream tool call arguments as input_json_delta
+                        if let Some(args) = tc.get("function")
+                            .and_then(|f| f.get("arguments"))
+                            .and_then(|a| a.as_str())
+                        {
+                            if !args.is_empty() {
+                                if let Some(buf) = tool_arg_buffers.get_mut(&block_index) {
+                                    buf.push_str(args);
                                 }
+                                let _ = tx.send(Event::default().event("content_block_delta").data(json!({
+                                    "type": "content_block_delta",
+                                    "index": block_index,
+                                    "delta": {
+                                        "type": "input_json_delta",
+                                        "partial_json": args
+                                    }
+                                }).to_string()));
                             }
                         }
                     }
@@ -315,15 +452,30 @@ pub async fn handle_anthropic_messages(
             }
         }
         
-        for idx in active_indices {
-            let _ = tx.send(Event::default().data(json!({"type": "content_block_stop", "index": idx}).to_string()));
+        // Close the last active block
+        if let Some(&last_idx) = active_indices.last() {
+            let _ = tx.send(Event::default().event("content_block_stop").data(json!({
+                "type": "content_block_stop",
+                "index": last_idx
+            }).to_string()));
         }
         
-        let _ = tx.send(Event::default().data(json!({
+        // message_delta with final stop reason
+        let _ = tx.send(Event::default().event("message_delta").data(json!({
             "type": "message_delta",
-            "delta": {"stop_reason": "end_turn", "stop_sequence": null}
+            "delta": {
+                "stop_reason": final_stop_reason,
+                "stop_sequence": null
+            },
+            "usage": {
+                "output_tokens": output_tokens
+            }
         }).to_string()));
-        let _ = tx.send(Event::default().data(json!({"type": "message_stop"}).to_string()));
+        
+        // message_stop
+        let _ = tx.send(Event::default().event("message_stop").data(json!({
+            "type": "message_stop"
+        }).to_string()));
     });
     
     Sse::new(futures::stream::unfold(rx, |mut rx| async move {
@@ -333,3 +485,4 @@ pub async fn handle_anthropic_messages(
         }
     })).into_response()
 }
+
