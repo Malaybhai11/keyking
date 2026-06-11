@@ -1,29 +1,14 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { ShieldAlert } from "lucide-react";
-import { PostHog } from "posthog-node";
-import semver from "semver";
+"use client";
 
-const phClient = new PostHog(
-  process.env.NEXT_PUBLIC_POSTHOG_KEY || 'phc_wsBwU2tc3HXLoaYwo9ikBfZc2vGqXcmCyAnfu2Hy8uyw',
-  {
-    host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://t.keyking.ledgion.in',
-    flushAt: 1,
-    flushInterval: 0
-  }
-);
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+import { ShieldAlert, Loader2 } from "lucide-react";
+import semver from "semver";
+import { Suspense } from "react";
+import { usePostHog } from 'posthog-js/react';
 
 const MIN_FALLBACK_VERSION = "3.0.0";
-
-async function getMinAllowedVersion(userEmail: string): Promise<string> {
-  try {
-    const payload = await phClient.getFeatureFlagPayload('app-version-policy', userEmail);
-    return (payload as any)?.min_allowed_version || MIN_FALLBACK_VERSION;
-  } catch {
-    return MIN_FALLBACK_VERSION;
-  }
-}
 
 function VersionBlockedPage() {
   return (
@@ -45,67 +30,82 @@ function VersionBlockedPage() {
   );
 }
 
-interface Props {
-  searchParams: Promise<{ app_version?: string }>;
+function AuthFailedPage() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fcf6e6] text-black font-sans">
+      <div className="p-8 border-[4px] border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center text-center max-w-sm w-full">
+        <ShieldAlert className="w-16 h-16 text-[#ff5f56] mb-4" />
+        <h1 className="text-3xl font-black uppercase tracking-tight mb-2">Auth Failed</h1>
+        <p className="text-sm font-medium text-neutral-600 mb-8">We could not authenticate your session.</p>
+      </div>
+    </div>
+  );
 }
 
-export default async function AppCallback({ searchParams }: Props) {
-  const params = await searchParams;
-  const appVersion = params.app_version;
+function AppCallbackInner() {
+  const searchParams = useSearchParams();
+  const appVersion = searchParams.get("app_version");
+  const [status, setStatus] = useState<"loading" | "blocked" | "failed">("loading");
+  const posthog = usePostHog();
 
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  useEffect(() => {
+    // Version gate: no version or invalid version = old app, block it
+    if (!appVersion || !semver.valid(appVersion) || semver.lt(appVersion, MIN_FALLBACK_VERSION)) {
+      setStatus("blocked");
+      return;
+    }
 
-  if (!session) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#fcf6e6] text-black font-sans">
-        <div className="p-8 border-[4px] border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center text-center max-w-sm w-full">
-          <ShieldAlert className="w-16 h-16 text-[#ff5f56] mb-4" />
-          <h1 className="text-3xl font-black uppercase tracking-tight mb-2">Auth Failed</h1>
-          <p className="text-sm font-medium text-neutral-600 mb-8">We could not authenticate your session.</p>
-        </div>
+    // Fetch session from better-auth using the browser's cookie (this is the key fix)
+    authClient.getSession().then(({ data: session, error }) => {
+      if (error || !session?.user) {
+        setStatus("failed");
+        return;
+      }
+
+      if (posthog) {
+        posthog.identify(session.user.id, {
+          email: session.user.email,
+          name: session.user.name,
+        });
+        posthog.capture("User Logged In", {
+          email: session.user.email,
+        });
+      }
+
+      // Session is valid — build the localhost redirect URL and send the user to the desktop app
+      const callbackUrl = new URL("http://localhost:8787/auth/callback");
+      callbackUrl.searchParams.set("session_id", session.session.token);
+      callbackUrl.searchParams.set("user_id", session.user.id);
+      callbackUrl.searchParams.set("email", session.user.email);
+
+      // Hard redirect to the desktop proxy — this is what delivers the auth to the app
+      window.location.href = callbackUrl.toString();
+    });
+  }, [appVersion, posthog]);
+
+  if (status === "blocked") return <VersionBlockedPage />;
+  if (status === "failed") return <AuthFailedPage />;
+
+  // Loading state while we fetch the session and redirect
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fcf6e6] text-black font-sans">
+      <div className="p-8 border-[4px] border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center text-center max-w-sm w-full">
+        <Loader2 className="w-12 h-12 animate-spin text-[#ff2a85] mb-4" />
+        <h1 className="text-2xl font-black uppercase tracking-tight mb-2">Connecting...</h1>
+        <p className="text-sm font-medium text-neutral-600">Redirecting you to the KeyKing desktop app.</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // Server-side hard gate: check app version before issuing the local session redirect.
-  // This blocks v2.x.x users (no app_version param) and any future deprecated versions.
-  if (!appVersion || !semver.valid(appVersion)) {
-    // No version param = old app (v2.x.x) that doesn't send it — block.
-    return <VersionBlockedPage />;
-  }
-
-  const minVersion = await getMinAllowedVersion(session.user.email);
-
-  if (semver.lt(appVersion, minVersion)) {
-    return <VersionBlockedPage />;
-  }
-
-  // Version is valid — redirect to the local proxy's auth callback with session details
-  const callbackUrl = new URL("http://localhost:8787/auth/callback");
-  callbackUrl.searchParams.set("session_id", session.session.token);
-  callbackUrl.searchParams.set("user_id", session.user.id);
-  callbackUrl.searchParams.set("email", session.user.email);
-  
-  // Track user login in PostHog server-side before redirect
-  phClient.identify({
-    distinctId: session.user.id,
-    properties: {
-      email: session.user.email,
-      name: session.user.name,
-    }
-  });
-
-  phClient.capture({
-    distinctId: session.user.id,
-    event: 'User Logged In',
-    properties: {
-      email: session.user.email,
-    }
-  });
-
-  await phClient.flush();
-  
-  redirect(callbackUrl.toString());
+export default function AppCallback() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-[#fcf6e6]">
+        <Loader2 className="w-8 h-8 animate-spin text-black" />
+      </div>
+    }>
+      <AppCallbackInner />
+    </Suspense>
+  );
 }
