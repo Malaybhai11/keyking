@@ -185,7 +185,7 @@ function App() {
   
   const posthog = usePostHog()
   
-  const { update, showToast, toastExiting, closeToast, installUpdate, isInstalling, installProgress, installError, checkForUpdates } = useUpdateStore()
+  const { update, showToast, toastExiting, closeToast, installUpdate, isInstalling, installProgress, checkForUpdates } = useUpdateStore()
 
   useEffect(() => {
     checkForUpdates()
