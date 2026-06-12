@@ -9,7 +9,7 @@ const db = new Kysely({
     client: createClient({
       url: process.env.DATABASE_URL || "",
       authToken: process.env.DATABASE_AUTH_TOKEN,
-    }),
+    }) as any,
   })
 });
 

@@ -105,7 +105,7 @@ export default async function AppCallback({ searchParams }: Props) {
     }
   });
 
-  await phClient.flushAsync();
+  await phClient.flush();
   
   redirect(callbackUrl.toString());
 }
