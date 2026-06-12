@@ -14,6 +14,7 @@ const db = new Kysely({
 });
 
 export const auth = betterAuth({
+    trustHost: true,
     database: kyselyAdapter(db, {
         type: "sqlite",
     }),
