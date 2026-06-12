@@ -32,5 +32,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0NDIyNzZGQzNBMDZCMEUKUldRT2E2RERieWRDUkJ3UDMvT0dMeWVQRUxaWGVTclM3NlBlRW5yTlJtd3Y3RzJMbmR0RGljYzYK",
+      "endpoints": [
+        "https://github.com/Malaybhai11/keyking/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

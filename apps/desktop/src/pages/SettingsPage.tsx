@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Crown } from 'lucide-react'
+import { useUpdateStore } from '../contexts/UpdateStore'
 
 export default function SettingsPage() {
 
   const [port, setPort] = useState(8787)
+  const { update, installUpdate, isInstalling, installProgress } = useUpdateStore()
 
   return (
     <div className="space-y-8 pb-12">
@@ -24,10 +26,25 @@ export default function SettingsPage() {
           </div>
         </div>
         
-        <div className="mt-6 bg-white border-2 border-neo-dark p-3 shadow-neo-sm">
-          <p className="text-neo-dark font-bold text-sm tracking-wide">
-            Enjoy! We are giving Ultra access to new users.
-          </p>
+        <div className="mt-6 bg-white border-2 border-neo-dark p-4 shadow-neo-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <p className="text-neo-dark font-black font-display text-lg tracking-wide uppercase">
+              Keep Ultra Access Free Forever
+            </p>
+            <p className="text-neo-dark/80 font-bold text-sm">
+              {update ? `Version ${update.version} is available to install!` : 'You are on the latest version.'}
+            </p>
+          </div>
+          {update && (
+            <button 
+              onClick={installUpdate} 
+              disabled={isInstalling}
+              className={`${isInstalling ? 'bg-neo-green' : 'bg-neo-pink'} text-white font-black font-display uppercase px-6 py-3 border-3 border-neo-dark shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all whitespace-nowrap cursor-pointer flex items-center gap-2`}
+            >
+              <Crown className="w-5 h-5" />
+              {isInstalling ? `Updating... ${installProgress}%` : 'Update Now'}
+            </button>
+          )}
         </div>
       </div>
       

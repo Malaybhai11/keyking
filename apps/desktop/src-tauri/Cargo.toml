@@ -27,6 +27,8 @@ machine-uid = "0.6"
 uuid = { version = "1", features = ["v4", "serde"] }
 base64 = "0.22"
 futures = "0.3"
+tauri-plugin-updater = "~2.0.0-beta"
+tauri-plugin-process = "~2.0.0-beta"
 
 [profile.release]
 strip = true

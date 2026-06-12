@@ -13,6 +13,7 @@ import RoutingRulesPage from './pages/RoutingRulesPage'
 import { usePostHog } from 'posthog-js/react'
 import { TourProvider } from './contexts/TourContext'
 import TourOverlay from './components/TourOverlay'
+import { useUpdateStore } from './contexts/UpdateStore'
 
 export interface RoutingEvent {
   id: string
@@ -91,14 +92,20 @@ function Sidebar() {
   const { events } = useEvents()
   const recent = events.filter(e => e.success).length
   const posthog = usePostHog()
+  const { update } = useUpdateStore()
 
   return (
     <aside className="w-[280px] bg-neo-bg border-r-3 border-neo-dark flex flex-col z-10 relative">
-      <div className="p-6 flex items-center gap-3 border-b-3 border-neo-dark bg-white">
+      <div className="p-6 flex items-center gap-3 border-b-3 border-neo-dark bg-white relative">
         <div className="w-10 h-10 bg-neo-yellow flex items-center justify-center border-3 border-neo-dark shadow-neo-sm">
           <Key className="w-6 h-6 text-neo-dark" />
         </div>
         <h1 className="text-2xl font-display font-black text-neo-dark tracking-tight uppercase">KeyKing</h1>
+        {update && (
+          <button className="absolute right-4 top-1/2 -translate-y-1/2 bg-neo-pink text-white text-[10px] font-black font-display uppercase px-2 py-1 border-2 border-neo-dark shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-px hover:shadow-none transition-all cursor-pointer">
+            Update
+          </button>
+        )}
       </div>
       
       <nav className="flex-1 px-4 py-6 space-y-3 font-display uppercase font-bold text-sm">
@@ -175,8 +182,14 @@ function App() {
   })
   const [isLocked, setIsLocked] = useState<boolean | 'loading'>('loading')
   const [lockReason, setLockReason] = useState<string>('')
-
+  
   const posthog = usePostHog()
+  
+  const { update, showToast, toastExiting, closeToast, installUpdate, isInstalling, installProgress, installError, checkForUpdates } = useUpdateStore()
+
+  useEffect(() => {
+    checkForUpdates()
+  }, [])
 
   useEffect(() => {
     const unlisten = listen<{session_id: string, user_id: string, email?: string}>('auth-success', (event) => {
@@ -324,6 +337,34 @@ function App() {
                 <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </div>
+            {/* Update Toast */}
+            {showToast && (
+              <div className={`fixed bottom-8 right-8 z-50 ${toastExiting ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
+                <div className="bg-neo-yellow border-4 border-neo-dark p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center gap-6">
+                  <div>
+                    <h3 className="text-xl font-black font-display uppercase tracking-tight text-neo-dark">Update v{update?.version}</h3>
+                    {isInstalling ? (
+                      <div className="w-full bg-white border-2 border-neo-dark h-4 mt-2 relative overflow-hidden">
+                        <div className="bg-neo-green h-full transition-all duration-300" style={{ width: `${installProgress}%` }}></div>
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold z-10">{installProgress}%</span>
+                      </div>
+                    ) : (
+                      <p className="font-bold text-neo-dark/80 text-sm">A new version is ready to install.</p>
+                    )}
+                  </div>
+                  {!isInstalling && (
+                    <button onClick={installUpdate} className="bg-neo-pink text-white font-black font-display uppercase px-4 py-2 border-3 border-neo-dark shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none transition-all cursor-pointer">
+                      Update Now!!
+                    </button>
+                  )}
+                  {!isInstalling && (
+                    <button onClick={closeToast} className="text-neo-dark hover:text-neo-pink absolute top-2 right-2 font-black cursor-pointer">
+                      X
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </main>
           <TourOverlay />
         </div>
