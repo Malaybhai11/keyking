@@ -28,7 +28,8 @@ import {
   Lock,
   Crown,
   Star,
-  X
+  X,
+  Menu
 } from "lucide-react";
 
 export default function Home() {
@@ -37,6 +38,7 @@ export default function Home() {
   
   // Coming Soon Popup Modal State
   const [showComingSoon, setShowComingSoon] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Playground Simulator State
   const [simState, setSimState] = useState<"idle" | "decrypting" | "routing" | "success" | "streaming">("idle");
@@ -218,11 +220,12 @@ console.log(response.choices[0].message.content);`
       </div>
 
       {/* NAVBAR */}
-      <header className="max-w-7xl mx-auto px-4 md:px-8 pt-3 pb-1">
-        <nav className="flex items-center justify-between border-[3px] border-black bg-white rounded-none py-2.5 px-4 shadow-[4px_4px_0px_0px_#000] sticky top-4 z-50">
-          <div className="flex items-center gap-3">
+      <header className="max-w-7xl mx-auto px-4 md:px-8 pt-3 pb-1 relative z-50">
+        <nav className="relative border-[3px] border-black bg-white rounded-none shadow-[4px_4px_0px_0px_#000] sticky top-4 flex flex-col z-50 w-full">
+          <div className="flex items-center justify-between py-2.5 px-4">
+            <div className="flex items-center gap-3">
             <div className="bg-[#fde047] text-black border-2 border-black p-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center">
-              <img src="/finalKK.png" alt="KeyKing Logo" className="h-8 w-auto block select-none" />
+              <img src="/icon.png" alt="KeyKing Logo" className="h-8 w-auto block select-none" />
             </div>
             <span className="font-display font-black text-xl uppercase tracking-tight hidden sm:inline">
               KeyKing
@@ -231,7 +234,7 @@ console.log(response.choices[0].message.content);`
 
           <div className="hidden md:flex items-center gap-8 font-display font-bold uppercase text-xs tracking-wider">
             <a href="/docs" className="hover:text-[#ff2a85] transition-colors text-[#ff2a85]">Docs</a>
-            <a href="/#features" className="hover:text-[#ff2a85] transition-colors">Features</a>
+            <a href="/use-cases" className="hover:text-[#ff2a85] transition-colors">Use Cases</a>
             <a href="/#playground" className="hover:text-[#ff2a85] transition-colors">cURL Playground</a>
             <a href="/#pricing" className="hover:text-[#ff2a85] transition-colors">Pricing</a>
             <a href="/#faq" className="hover:text-[#ff2a85] transition-colors">Developer FAQ</a>
@@ -244,11 +247,40 @@ console.log(response.choices[0].message.content);`
             >
               Sign In
             </button>
-            <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer">
+            <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer" className="hidden sm:inline-block">
               <NeoButton variant="pink" size="sm">
                 Get Client
               </NeoButton>
             </a>
+            <details className="md:hidden relative group">
+              <summary className="p-2 bg-[#fde047] border-[2px] border-black shadow-[4px_4px_0px_0px_#000] z-[9999] cursor-pointer relative active:translate-y-1 active:translate-x-1 active:shadow-none transition-all list-none [&::-webkit-details-marker]:hidden flex items-center justify-center">
+                <Menu className="w-6 h-6 group-open:hidden" />
+                <X className="w-6 h-6 hidden group-open:block" />
+              </summary>
+              
+              <div className="fixed top-[80px] left-4 right-4 border-[3px] border-black bg-[#fcf6e6] p-6 shadow-[8px_8px_0px_0px_#000] flex flex-col gap-6 font-display font-black uppercase text-lg tracking-wider z-[999999] overflow-y-auto max-h-[calc(100vh-100px)]">
+                <a href="/docs" className="hover:text-[#ff2a85] transition-colors text-black border-[3px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_#000]">Docs</a>
+                <a href="/use-cases" className="hover:text-[#ff2a85] transition-colors text-black border-[3px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_#000]">Use Cases</a>
+                <a href="/#playground" className="hover:text-[#ff2a85] transition-colors text-black border-[3px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_#000]">cURL Playground</a>
+                <a href="/#pricing" className="hover:text-[#ff2a85] transition-colors text-black border-[3px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_#000]">Pricing</a>
+                <a href="/#faq" className="hover:text-[#ff2a85] transition-colors text-black border-[3px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_#000]">Developer FAQ</a>
+                
+                <div className="flex flex-col gap-4 pt-4">
+                  <button 
+                    onClick={() => setShowComingSoon(true)}
+                    className="w-full py-4 bg-black text-[#00f0ff] border-[3px] border-black shadow-[4px_4px_0px_0px_#ff2a85] uppercase tracking-widest text-sm active:translate-y-1 active:translate-x-1 active:shadow-none transition-all cursor-pointer"
+                  >
+                    Sign In
+                  </button>
+                  <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer" className="w-full block">
+                    <button className="w-full py-4 bg-[#ff2a85] text-white border-[3px] border-black shadow-[4px_4px_0px_0px_#000] uppercase tracking-widest text-sm active:translate-y-1 active:translate-x-1 active:shadow-none transition-all cursor-pointer">
+                      Get Client
+                    </button>
+                  </a>
+                </div>
+              </div>
+            </details>
+          </div>
           </div>
         </nav>
       </header>
@@ -260,28 +292,28 @@ console.log(response.choices[0].message.content);`
           <div className="lg:col-span-5 space-y-4 min-w-0">
             <div className="inline-flex">
               <NeoBadge variant="green" interactive className="text-[10px] tracking-widest font-mono">
-                <Star className="w-3.5 h-3.5 fill-current animate-pulse" /> UNLOCK 1.7 BILLION FREE TOKENS / MONTH
+                <Star className="w-3.5 h-3.5 fill-current animate-pulse" /> YOUR PERSONAL AI GATEWAY
               </NeoBadge>
             </div>
 
-            <h1 className="font-display font-black text-3xl sm:text-5xl lg:text-[54px] tracking-tight leading-[0.95] uppercase">
-              Never Hit <br />
-              Rate Limits <br />
+            <h1 className="font-display font-black text-4xl sm:text-5xl lg:text-[60px] tracking-tight leading-[0.95] uppercase">
+              One API Key. <br />
               <span className="relative inline-block z-10 px-2 py-0.5 my-0.5">
                 <span className="absolute inset-0 bg-[#fde047] border-[3px] border-black -skew-x-2 -rotate-1 -z-10 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></span>
-                Again
-              </span>
+                Every
+              </span> <br />
+              AI Model.
             </h1>
 
-            <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed max-w-xl">
-              A comprehensive toolchain for secure LLM API access. Route across every credible free-tier LLM provider utilizing 1.7 Billion free tokens per month. Bring your own keys; we just point requests at whichever provider still has budget left.
-            </p>
+            <h2 className="text-sm sm:text-base text-neutral-800 font-medium leading-relaxed max-w-xl">
+              Stop pasting your real API keys into every new project. KeyKing securely stores your keys on your computer and gives you one universal local endpoint. It automatically switches providers if you hit a rate limit.
+            </h2>
 
             <div className="flex flex-col gap-2 max-w-xl">
-              <div className="bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
-                <div className="truncate flex items-center gap-1.5">
-                  <span className="text-[#ff2a85] font-bold">Install Desktop Proxy:</span> 
-                  <span>{installCommand}</span>
+              <div className="w-full min-w-0 bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                  <span className="text-[#ff2a85] font-bold shrink-0">Install Desktop Proxy:</span> 
+                  <span className="truncate">{installCommand}</span>
                 </div>
                 <button 
                   onClick={() => copyToClipboard(installCommand, "install")}
@@ -292,10 +324,10 @@ console.log(response.choices[0].message.content);`
                 </button>
               </div>
 
-              <div className="bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
-                <div className="truncate flex items-center gap-1.5">
-                  <span className="text-[#ff2a85] font-bold">Install Serverless SDK:</span> 
-                  <span>npm install keyking-sdk</span>
+              <div className="w-full min-w-0 bg-black text-[#00e676] border-[3px] border-black p-2.5 font-mono text-[11px] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative select-all flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                  <span className="text-[#ff2a85] font-bold shrink-0">Install Serverless SDK:</span> 
+                  <span className="truncate">npm install keyking-sdk</span>
                 </div>
                 <button 
                   onClick={() => copyToClipboard("npm install keyking-sdk", "install-sdk")}
@@ -411,7 +443,7 @@ console.log(response.choices[0].message.content);`
                 </div>
 
                 {/* Dashboard Stats */}
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-3 gap-1 sm:gap-2 text-center">
                   <div className="bg-neutral-900 border border-neutral-800 p-2.5">
                     <span className="block text-neutral-500 text-[9px] uppercase">Active Keys</span>
                     <span className="block text-lg font-bold text-white font-mono">{metricKeys}</span>
@@ -525,14 +557,14 @@ console.log(response.choices[0].message.content);`
         
         <div className="text-center max-w-2xl mx-auto space-y-4 mb-16">
           <h2 className="font-display font-black text-3xl sm:text-5xl uppercase tracking-tight">
-            One Ecosystem, Three Powerful Workflows
+            One Ecosystem, Four Powerful Workflows
           </h2>
           <p className="text-sm text-neutral-700 font-medium">
-            Whether you are vibe-coding locally or scaling a serverless production app, KeyKing provides the ultimate infrastructure for LLM API security.
+            Whether you are vibe-coding locally, getting free AI APIs, running free Claude Code, or scaling a serverless app, KeyKing is the ultimate aggregator.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8">
           
           <NeoCard titleBar="LOCAL DEVELOPMENT" variant="green" hoverExpand shadowSize="md">
             <div className="space-y-3 flex-1 flex flex-col justify-between">
@@ -570,6 +602,19 @@ console.log(response.choices[0].message.content);`
                 </p>
               </div>
               <NeoBadge variant="dark" className="self-start mt-2">Zero-Trust AES-256</NeoBadge>
+            </div>
+          </NeoCard>
+
+          <NeoCard titleBar="CLAUDE CODE CLI" variant="pink" hoverExpand shadowSize="md">
+            <div className="space-y-3 flex-1 flex flex-col justify-between">
+              <div className="space-y-2">
+                <Zap className="w-8 h-8 text-white" />
+                <h3 className="font-display font-extrabold text-lg uppercase tracking-tight leading-tight">Free Claude Code</h3>
+                <p className="text-xs text-white/90 leading-relaxed font-medium">
+                  Stop burning through Anthropic credits. Run the new Anthropic <code>claude-code</code> agentic CLI completely for free. Just type <code>keyking-claude</code> in your terminal and we automatically intercept the agent and route it through your aggregated free AI APIs.
+                </p>
+              </div>
+              <NeoBadge variant="dark" className="self-start mt-2">Zero-Config Interceptor</NeoBadge>
             </div>
           </NeoCard>
 
@@ -716,8 +761,8 @@ console.log(response.choices[0].message.content);`
 
                   {/* Transaction metadata */}
                   {simState !== "idle" && (
-                    <div className="border-t border-neutral-800 pt-3 mt-4 flex flex-wrap items-center justify-between text-[10px] text-neutral-500">
-                      <div className="flex items-center gap-4">
+                    <div className="border-t border-neutral-800 pt-3 mt-4 flex flex-wrap items-center justify-between gap-2 text-[10px] text-neutral-500">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                         <span>ROUTE: <strong className="text-[#00f0ff]">{simRoute || "EVALUATING..."}</strong></span>
                         <span>LATENCY: <strong className="text-[#ff2a85]">{simLatency ? `${simLatency}ms` : "PENDING..."}</strong></span>
                         <span>TOKENS: <strong className="text-[#fde047]">{simTokens || 0}</strong></span>

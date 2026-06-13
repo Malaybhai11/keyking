@@ -70,9 +70,16 @@ export default function Docs() {
                 Ecosystem
               </span>
             </h1>
-            <p className="text-sm sm:text-base text-neutral-800 font-medium leading-relaxed">
+            <p className="text-sm sm:text-base text-neutral-800 font-medium leading-relaxed mb-6">
               Feed our context rules into Cursor, Copilot, or your favorite LLM. Get up and running with KeyKing's Desktop Proxy and Serverless SDK in minutes.
             </p>
+            <div className="flex gap-4">
+              <Link href="/docs/pro">
+                <NeoButton variant="dark" size="lg">
+                  Docs For Nerds
+                </NeoButton>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -110,7 +117,7 @@ export default function Docs() {
               
               <div className="pt-4 space-y-2">
                 <div className="font-display font-bold text-xs uppercase tracking-wider text-black/60">Export Variables</div>
-                <div className="bg-black text-[#00e676] border-[3px] border-black p-3 font-mono text-[11px] shadow-inner relative rounded-lg">
+                <div className="bg-black text-[#00e676] border-[3px] border-black p-3 pr-10 font-mono text-[11px] shadow-inner relative rounded-lg overflow-x-auto whitespace-nowrap">
                   <div className="mb-2">export OPENAI_BASE_URL=http://localhost:8787/v1</div>
                   <div>export OPENAI_API_KEY=sk-keyking</div>
                   <button 
@@ -134,7 +141,7 @@ export default function Docs() {
               
               <div className="pt-4 space-y-2">
                 <div className="font-display font-bold text-xs uppercase tracking-wider text-black/60">NPM Install</div>
-                <div className="bg-black text-[#00bdff] border-[3px] border-black p-3 font-mono text-[11px] shadow-inner relative rounded-lg">
+                <div className="bg-black text-[#00bdff] border-[3px] border-black p-3 pr-10 font-mono text-[11px] shadow-inner relative rounded-lg overflow-x-auto whitespace-nowrap">
                   <div>npm install keyking-sdk</div>
                   <button 
                     onClick={() => copyToClipboard("npm install keyking-sdk", "npm")}
@@ -157,12 +164,12 @@ export default function Docs() {
               
               <div className="pt-4 space-y-2">
                 <div className="font-display font-bold text-xs uppercase tracking-wider text-white/60">Generate Vault</div>
-                <div className="bg-white text-[#ff2a85] border-[3px] border-white p-3 font-mono text-[11px] shadow-inner relative rounded-lg">
+                <div className="bg-white text-[#ff2a85] border-[3px] border-white p-3 pr-10 font-mono text-[11px] shadow-inner relative rounded-lg overflow-x-auto whitespace-nowrap">
                   <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4" /> Export from Keys Tab
+                    <Check className="w-4 h-4 shrink-0" /> Export from Keys Tab
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <Check className="w-4 h-4" /> Save as vault.kk
+                    <Check className="w-4 h-4 shrink-0" /> Save as vault.kk
                   </div>
                 </div>
               </div>

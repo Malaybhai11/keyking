@@ -15,8 +15,20 @@ const lexend = Lexend({
 });
 
 export const metadata: Metadata = {
-  title: "KeyKing — The Developer Ecosystem for LLMs",
-  description: "Secure your AI credentials with KeyKing. Use the Desktop Proxy for local vibe-coding, the NPM SDK for serverless production deployment, and manage it all in the Desktop Vault.",
+  title: "KeyKing | Free Claude Code & Free AI API Aggregator",
+  description: "KeyKing is the ultimate API aggregator to run Free Claude Code and get Free AI API access. Pool your free tiers, bypass rate limits, and vibe-code locally with zero limits. Get 1.7 Billion free LLM tokens with KeyKing today.",
+  keywords: ["KeyKing", "free claude code", "free AI API", "claude code", "AI aggregator", "vibe coding", "bypass rate limits"],
+  openGraph: {
+    title: "KeyKing | Run Claude Code for Free",
+    description: "Get Free AI API access and run Claude Code without limits. KeyKing aggregates LLM free tiers to give you unlimited tokens.",
+    type: "website",
+    url: "https://keyking.ledgion.in",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "KeyKing | Free Claude Code & AI API",
+    description: "Aggregate free AI APIs and run Claude Code for free. Never hit an LLM rate limit again.",
+  }
 };
 
 import { PHProvider } from "./providers";
@@ -34,7 +46,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <PHProvider>
-        <body className="min-h-full flex flex-col font-body bg-neo-bg text-black" suppressHydrationWarning>
+        <body className="min-h-full flex flex-col font-body bg-neo-bg text-black overflow-x-hidden" suppressHydrationWarning>
           <PostHogPageView />
           {children}
         </body>

@@ -53,23 +53,23 @@ export default function DownloadPage() {
   return (
     <div className="min-h-screen bg-[#f4f4f0] text-black font-body p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
-        <header className="mb-12 flex justify-between items-center">
+        <header className="mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 sm:gap-4">
           <Link href="/" className="inline-block">
             <NeoButton variant="light" size="sm" className="flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" /> Back to Home
             </NeoButton>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <h1 className="text-2xl font-black font-display uppercase tracking-tighter">KEYKING</h1>
             <NeoBadge variant="pink">{latestVersion}</NeoBadge>
           </div>
         </header>
 
         <div className="text-center mb-16">
-          <h2 className="text-5xl md:text-7xl font-black font-display uppercase tracking-tighter mb-6 leading-none">
+          <h2 className="text-4xl sm:text-5xl md:text-7xl font-black font-display uppercase tracking-tighter mb-6 leading-none">
             Get the <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff2a85] to-[#9d4edd] drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]">Proxy</span>
           </h2>
-          <p className="text-xl font-medium max-w-2xl mx-auto border-[3px] border-black bg-white p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-base sm:text-xl font-medium max-w-2xl mx-auto border-[3px] border-black bg-white p-3 sm:p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
             Install the KeyKing Desktop app to start routing local LLM requests and manage your secure API vault.
           </p>
         </div>
@@ -81,7 +81,7 @@ export default function DownloadPage() {
               <p className="mb-6 text-sm font-medium">
                 The fastest way to install KeyKing. Automatically configures your PATH and installs the correct binary for your system.
               </p>
-              <div className="bg-black text-[#00e676] border-[3px] border-black p-4 font-mono text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,0.5)] relative select-all flex items-center justify-between gap-4">
+              <div className="bg-black text-[#00e676] border-[3px] border-black p-4 font-mono text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,0.5)] relative select-all flex items-start sm:items-center justify-between gap-4">
                 <span className="break-all">{getCommandLine()}</span>
                 <button 
                   onClick={() => copyToClipboard(getCommandLine(), "cli")}
