@@ -93,10 +93,10 @@ export default function UseCasesPage() {
       </header>
 
       <main className="max-w-[1600px] mx-auto px-6 py-12">
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-8 items-start mb-12">
           
           {/* LEFT SIDEBAR */}
-          <aside className="w-full lg:w-[320px] lg:sticky lg:top-28 shrink-0">
+          <aside className="w-full lg:w-[320px] shrink-0">
             <h1 className="font-display font-black text-5xl xl:text-6xl uppercase tracking-tighter leading-none mb-6 text-black drop-shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
               USE CASES
             </h1>
@@ -104,7 +104,7 @@ export default function UseCasesPage() {
               Real projects you can build<br/>with KeyKing.
             </p>
             
-            <button className="bg-black text-white font-display font-black uppercase text-sm tracking-widest px-6 py-4 flex items-center justify-between w-[280px] hover:bg-[#ff2a85] transition-colors border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] group">
+            <button className="bg-black text-white font-display font-black uppercase text-sm tracking-widest px-6 py-4 flex items-center justify-between w-full md:w-[280px] hover:bg-[#ff2a85] transition-colors border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] group">
               <span>BROWSE ALL BLUEPRINTS</span>
               <ArrowUpRight className="w-5 h-5 group-hover:rotate-12 transition-transform" />
             </button>
@@ -122,10 +122,8 @@ export default function UseCasesPage() {
             </div>
           </aside>
 
-          {/* RIGHT CONTENT GRID */}
-          <div className="flex-1 w-full space-y-8">
-            
-            {/* FEATURED CARD */}
+          {/* FEATURED CARD */}
+          <div className="flex-1 w-full">
             {featured && (
               <div className="bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col xl:flex-row relative group">
                 <div className="absolute -top-4 left-4 bg-[#fde047] border-[3px] border-black px-3 py-1 font-display font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] z-10">
@@ -164,39 +162,38 @@ export default function UseCasesPage() {
                 </div>
               </div>
             )}
-
-            {/* REGULAR CARDS GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-              {regular.map(item => (
-                <div key={item.id} className="bg-white border-[4px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col hover:-translate-y-2 hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] transition-all group">
-                  <div className="border-b-[4px] border-black bg-gray-100 p-2 h-[220px] overflow-hidden">
-                    <img src={item.image} alt={item.title} className="w-full h-full object-cover object-top border-2 border-black" />
-                  </div>
-                  <div className="p-5 flex flex-col flex-1">
-                    <h3 className="font-display font-black text-lg uppercase mb-3 tracking-tight leading-tight">
-                      {item.title}
-                    </h3>
-                    <p className="font-mono text-xs font-semibold leading-relaxed text-gray-700 mb-6 flex-1">
-                      {item.desc}
-                    </p>
-                    <div className="flex items-end justify-between mt-auto">
-                      <div className="flex flex-wrap gap-1.5">
-                        {item.tags.map(tag => (
-                          <span key={tag} className="border-2 border-black px-2 py-0.5 font-display font-black text-[9px] uppercase tracking-wider bg-[#fcf6e6]">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <button className="w-10 h-10 shrink-0 border-[3px] border-black flex items-center justify-center bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] group-hover:bg-[#00e676] transition-colors ml-2">
-                        <ArrowUpRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
           </div>
+        </div>
+
+        {/* REGULAR CARDS GRID - Full Width */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {regular.map(item => (
+            <div key={item.id} className="bg-white border-[4px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col hover:-translate-y-2 hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] transition-all group">
+              <div className="border-b-[4px] border-black bg-gray-100 p-2 h-[220px] overflow-hidden">
+                <img src={item.image} alt={item.title} className="w-full h-full object-cover object-top border-2 border-black" />
+              </div>
+              <div className="p-5 flex flex-col flex-1">
+                <h3 className="font-display font-black text-lg uppercase mb-3 tracking-tight leading-tight">
+                  {item.title}
+                </h3>
+                <p className="font-mono text-xs font-semibold leading-relaxed text-gray-700 mb-6 flex-1">
+                  {item.desc}
+                </p>
+                <div className="flex items-end justify-between mt-auto">
+                  <div className="flex flex-wrap gap-1.5">
+                    {item.tags.map(tag => (
+                      <span key={tag} className="border-2 border-black px-2 py-0.5 font-display font-black text-[9px] uppercase tracking-wider bg-[#fcf6e6]">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <button className="w-10 h-10 shrink-0 border-[3px] border-black flex items-center justify-center bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] group-hover:bg-[#00e676] transition-colors ml-2">
+                    <ArrowUpRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </main>
     </div>
