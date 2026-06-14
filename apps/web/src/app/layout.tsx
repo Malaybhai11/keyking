@@ -15,19 +15,24 @@ const lexend = Lexend({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://keyking.ledgion.in'),
   title: "KeyKing | Free Claude Code & Free AI API Aggregator",
-  description: "KeyKing is the ultimate API aggregator to run Free Claude Code and get Free AI API access. Pool your free tiers, bypass rate limits, and vibe-code locally with zero limits. Get 1.7 Billion free LLM tokens with KeyKing today.",
-  keywords: ["KeyKing", "free claude code", "free AI API", "claude code", "AI aggregator", "vibe coding", "bypass rate limits"],
+  description: "KeyKing is the ultimate Zero-Trust LLM API aggregator. Manage API Keys locally, run Free Claude Code, pool your free tiers, and bypass rate limits with zero limits. Get 1.7 Billion free LLM tokens with KeyKing today.",
+  keywords: ["KeyKing", "Free Claude Code", "Free AI API", "Zero-Trust LLM API", "Manage API Keys", "AI aggregator", "vibe coding", "bypass rate limits"],
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    title: "KeyKing | Run Claude Code for Free",
-    description: "Get Free AI API access and run Claude Code without limits. KeyKing aggregates LLM free tiers to give you unlimited tokens.",
+    title: "KeyKing | Run Claude Code for Free & Manage API Keys",
+    description: "Get Free AI API access, manage API keys securely with Zero-Trust encryption, and run Claude Code without limits. KeyKing aggregates LLM free tiers to give you unlimited tokens.",
     type: "website",
     url: "https://keyking.ledgion.in",
+    siteName: "KeyKing Ecosystem",
   },
   twitter: {
     card: "summary_large_image",
-    title: "KeyKing | Free Claude Code & AI API",
-    description: "Aggregate free AI APIs and run Claude Code for free. Never hit an LLM rate limit again.",
+    title: "KeyKing | Free Claude Code & Zero-Trust AI API",
+    description: "Aggregate free AI APIs and run Claude Code for free. Manage your API keys locally with zero trust. Never hit an LLM rate limit again.",
   }
 };
 
@@ -39,12 +44,39 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "KeyKing",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "url": "https://keyking.ledgion.in",
+    "description": "KeyKing is the ultimate Zero-Trust LLM API aggregator. Manage API Keys locally and bypass rate limits.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0.00",
+      "priceCurrency": "USD"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "KeyKing",
+      "url": "https://keyking.ledgion.in",
+      "logo": "https://keyking.ledgion.in/icon.png"
+    }
+  };
+
   return (
     <html
       lang="en"
       className={`${spaceGrotesk.variable} ${lexend.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <PHProvider>
         <body className="min-h-full flex flex-col font-body bg-neo-bg text-black overflow-x-hidden" suppressHydrationWarning>
           <PostHogPageView />

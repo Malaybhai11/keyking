@@ -225,7 +225,7 @@ console.log(response.choices[0].message.content);`
           <div className="flex items-center justify-between py-2.5 px-4">
             <div className="flex items-center gap-3">
             <div className="bg-[#fde047] text-black border-2 border-black p-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center">
-              <img src="/icon.png" alt="KeyKing Logo" className="h-8 w-auto block select-none" />
+              <img src="/icon.png" alt="KeyKing Official Logo - Zero Trust Free Claude Code & AI Aggregator" className="h-8 w-auto block select-none" />
             </div>
             <span className="font-display font-black text-xl uppercase tracking-tight hidden sm:inline">
               KeyKing
@@ -233,9 +233,9 @@ console.log(response.choices[0].message.content);`
           </div>
 
           <div className="hidden md:flex items-center gap-8 font-display font-bold uppercase text-xs tracking-wider">
-            <a href="/docs" className="hover:text-[#ff2a85] transition-colors text-[#ff2a85]">Docs</a>
-            <a href="/use-cases" className="hover:text-[#ff2a85] transition-colors">Use Cases</a>
-            <a href="/#playground" className="hover:text-[#ff2a85] transition-colors">cURL Playground</a>
+            <a href="/docs" title="KeyKing Documentation" className="hover:text-[#ff2a85] transition-colors text-[#ff2a85]">Docs</a>
+            <a href="/use-cases" title="KeyKing AI Use Cases" className="hover:text-[#ff2a85] transition-colors">Use Cases</a>
+            <a href="/#playground" title="KeyKing cURL Playground" className="hover:text-[#ff2a85] transition-colors">cURL Playground</a>
             <a href="/#pricing" className="hover:text-[#ff2a85] transition-colors">Pricing</a>
             <a href="/#faq" className="hover:text-[#ff2a85] transition-colors">Developer FAQ</a>
           </div>
@@ -247,7 +247,7 @@ console.log(response.choices[0].message.content);`
             >
               Sign In
             </button>
-            <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer" className="hidden sm:inline-block">
+            <a href="https://github.com/Malaybhai11/keyking/releases/latest" title="Download KeyKing App" target="_blank" rel="noopener noreferrer" className="hidden sm:inline-block">
               <NeoButton variant="pink" size="sm">
                 Get Client
               </NeoButton>
@@ -296,14 +296,17 @@ console.log(response.choices[0].message.content);`
               </NeoBadge>
             </div>
 
-            <h1 className="font-display font-black text-4xl sm:text-5xl lg:text-[60px] tracking-tight leading-[0.95] uppercase">
+            <h1 className="sr-only">
+              KeyKing - The Zero-Trust Free AI API Aggregator to run Free Claude Code and Manage API Keys Locally.
+            </h1>
+            <h2 className="font-display font-black text-4xl sm:text-5xl lg:text-[60px] tracking-tight leading-[0.95] uppercase">
               One API Key. <br />
               <span className="relative inline-block z-10 px-2 py-0.5 my-0.5">
                 <span className="absolute inset-0 bg-[#fde047] border-[3px] border-black -skew-x-2 -rotate-1 -z-10 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></span>
                 Every
               </span> <br />
               AI Model.
-            </h1>
+            </h2>
 
             <h2 className="text-sm sm:text-base text-neutral-800 font-medium leading-relaxed max-w-xl">
               Stop pasting your real API keys into every new project. KeyKing securely stores your keys on your computer and gives you one universal local endpoint. It automatically switches providers if you hit a rate limit.
@@ -340,7 +343,7 @@ console.log(response.choices[0].message.content);`
             </div>
 
             <div className="flex flex-wrap gap-3 pt-1">
-              <a href="https://github.com/Malaybhai11/keyking/releases/latest" target="_blank" rel="noopener noreferrer" className="inline-block">
+              <a href="https://github.com/Malaybhai11/keyking/releases/latest" title="Download KeyKing Desktop Client for Windows, Mac, Linux" target="_blank" rel="noopener noreferrer" className="inline-block">
                 <NeoButton variant="green" size="md" shadowColor="dark" className="flex items-center gap-2">
                   <span>Download Desktop Client</span>
                   <ArrowRight className="w-4 h-4" />
@@ -910,20 +913,20 @@ console.log(response.choices[0].message.content);`
           
           {[
             {
-              q: "Where are upstream API credentials stored?",
-              a: "Your unencrypted credentials never leave your local environment. They are managed in the Desktop Vault and stored securely on your device, encrypted with AES-256-GCM using keys derived from your hardware fingerprint. When deploying to production using the Serverless SDK, you export a portable encrypted vault (vault.kk) locked with a separate deployment key, ensuring zero plaintext exposure in your cloud environments."
+              q: "What is KeyKing and how does it secure my Free AI API credentials?",
+              a: "KeyKing is a Zero-Trust API Key Management ecosystem. Your unencrypted credentials never leave your local environment. They are managed in the Desktop Vault and stored securely on your device, encrypted with AES-256-GCM. When deploying to production using the Serverless SDK, you export a portable encrypted vault (vault.kk) locked with a separate deployment key, ensuring zero plaintext exposure in your cloud environments."
             },
             {
-              q: "Does running the local proxy server introduce measurable latency?",
+              q: "Can I run Free Claude Code using KeyKing?",
+              a: "Yes! KeyKing acts as a local Axum proxy (localhost:8787). You can intercept Anthropic's Claude Code CLI requests and dynamically route them through your aggregated Free AI API tier quotas (like Groq, Mistral, and Gemini) using our Priority Ladder, so you never pay for tokens again."
+            },
+            {
+              q: "How does the KeyKing Priority Ladder handle API rate limits?",
+              a: "The KeyKing routing engine automatically parses rate-limit headers from upstream HTTP responses. If a 429 Too Many Requests status is detected or a quota is depleted, the internal circuit breaker for that key is tripped. The Priority Ladder immediately cascades subsequent requests to alternative Free AI APIs without breaking your application."
+            },
+            {
+              q: "Does running the KeyKing local proxy server introduce measurable latency?",
               a: "No. The local proxy is built using high-performance Rust libraries (Axum, Hyper, and Tokio). Under normal operating conditions, internal proxy overhead is less than one millisecond (<1ms). The overall response time is dominated by upstream API network latency."
-            },
-            {
-              q: "How is subscription status verified if credentials remain local?",
-              a: "Upon initialization, the desktop client generates a unique cryptographic hash of your hardware fingerprint to authenticate against our secure control plane. Subscription status is verified securely via payment processor webhooks. Your unencrypted API keys are never transmitted to or stored on our servers."
-            },
-            {
-              q: "How are API rate limits and upstream outages handled?",
-              a: "The proxy automatically parses rate-limit headers from upstream HTTP responses. If a 429 Too Many Requests status is detected or a quota is depleted, the internal circuit breaker for that key is tripped. The intelligent router immediately redirects subsequent requests to alternative active keys or fallbacks to other configured upstream providers."
             }
           ].map((faq, index) => (
             <div 

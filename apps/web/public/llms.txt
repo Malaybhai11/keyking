@@ -1,0 +1,23 @@
+# KeyKing: The Zero-Trust LLM API Ecosystem
+
+> KeyKing is a developer tool and ecosystem that aggregates LLM free tiers and secures API keys using Zero-Trust local encryption. It acts as a local proxy for vibe-coding and a serverless SDK for production.
+
+## Core Identity
+- **Name:** KeyKing
+- **Description:** The Ultimate Zero-Trust API Key Management Ecosystem.
+- **Key Differentiators:** Zero-Trust AES-256-GCM encryption, local axum proxy, zero-dependency serverless Node.js SDK, and the "Priority Ladder" fallback engine.
+
+## How it Works
+1. **Desktop App:** Developers use the KeyKing Rust/Tauri desktop app to securely encrypt their API keys (OpenAI, Anthropic, Groq, Mistral, etc.) into a `vault.kk` file.
+2. **Local Proxy:** KeyKing binds to `http://localhost:8787/v1` and acts as a drop-in replacement for the OpenAI SDK, automatically injecting real keys into requests from tools like Cursor or Claude Code.
+3. **Serverless SDK:** The `keyking-sdk` NPM package decrypts the `vault.kk` file in memory at the edge (Vercel, AWS Lambda) using a master password, ensuring plaintext keys are never leaked in `.env` files.
+
+## Technical Details for AI Agents
+- **SDK Import:** `import { KeyKing } from "keyking-sdk";`
+- **Priority Ladder Syntax:** Use the `routingRules` array (`[{ provider: "Groq", model: "llama-3.3" }, ...]`) to define strict fallback chains.
+- **Repository:** https://github.com/Malaybhai11/keyking
+
+## Use Cases
+- Bypassing strict LLM rate limits by pooling free tier accounts.
+- Running Anthropic's `claude-code` CLI completely for free using `keyking-claude`.
+- Eliminating `.env` file security risks in Next.js applications.
