@@ -99,11 +99,24 @@ console.log(response.choices[0].message.content);
 
 | Option       | Type      | Default                      | Description                          |
 |-------------|-----------|------------------------------|--------------------------------------|
-| `vault`     | `string`  | `process.env.KEYKING_VAULT`  | Encrypted vault string               |
-| `password`  | `string`  | `process.env.KEYKING_PASSWORD` | Vault decryption password          |
-| `timeout`   | `number`  | `60000`                      | Request timeout in ms                |
-| `maxRetries`| `number`  | `3`                          | Max fallback attempts                |
-| `debug`     | `boolean` | `false`                      | Log routing decisions to stderr      |
+| `vault`        | `string`        | `process.env.KEYKING_VAULT`  | Encrypted vault string               |
+| `password`     | `string`        | `process.env.KEYKING_PASSWORD` | Vault decryption password          |
+| `timeout`      | `number`        | `60000`                      | Request timeout in ms                |
+| `maxRetries`   | `number`        | `3`                          | Max fallback attempts                |
+| `routingRules` | `RoutingRule[]` | `undefined`                  | Array of `{ provider, model }` pairs for strict, ordered fallback routing. If provided, disables default auto-mapping fallback behavior. |
+| `debug`        | `boolean`       | `false`                      | Log routing decisions to stderr      |
+
+### Example: Strict Priority Routing (The Moat)
+
+```typescript
+const keyking = new KeyKing({
+  routingRules: [
+    { provider: "Groq",      model: "llama-3.3-70b-versatile" },
+    { provider: "Anthropic", model: "claude-3-5-sonnet-20241022" },
+    { provider: "OpenAI",    model: "gpt-4o" }
+  ]
+});
+```
 
 ### `keyking.chat.completions.create(request)`
 

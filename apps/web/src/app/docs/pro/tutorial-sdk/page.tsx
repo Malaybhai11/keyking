@@ -55,7 +55,12 @@ npm install keyking-sdk{`\n\n`}
 
 <span className="text-neutral-500 italic">// Code</span>{`\n`}
 <span className="text-[#ff2a85]">import</span> {`{ KeyKing }`} <span className="text-[#ff2a85]">from</span> <span className="text-[#00e676]">"keyking-sdk"</span>;{`\n`}
-<span className="text-[#ff2a85]">const</span> keyking = <span className="text-[#ff2a85]">new</span> KeyKing(); <span className="text-neutral-500 italic">// Auto-loads from env</span>
+<span className="text-[#ff2a85]">const</span> keyking = <span className="text-[#ff2a85]">new</span> KeyKing({`{\n`}
+  routingRules: [
+    {`{ provider: `}<span className="text-[#00e676]">"Groq"</span>{`, model: `}<span className="text-[#00e676]">"llama-3.3-70b-versatile"</span>{` },`}{`\n`}
+    {`{ provider: `}<span className="text-[#00e676]">"Anthropic"</span>{`, model: `}<span className="text-[#00e676]">"claude-3-5-sonnet-20241022"</span>{` }`}{`\n`}
+  ]
+{`});`} <span className="text-neutral-500 italic">// Auto-loads keys from env</span>
  </pre>
  </div>
  </div>

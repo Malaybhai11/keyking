@@ -2,6 +2,7 @@ import { decryptVault } from "./vault.js";
 import { routeRequest, resolveProvider } from "./router.js";
 import type {
   KeyKingConfig,
+  RoutingRule,
   VaultEntry,
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -57,17 +58,20 @@ class Completions {
   private readonly timeout: number;
   private readonly maxRetries: number;
   private readonly debug: boolean;
+  private readonly routingRules?: RoutingRule[];
 
   constructor(
     getEntries: () => Promise<VaultEntry[]>,
     timeout: number,
     maxRetries: number,
-    debug: boolean
+    debug: boolean,
+    routingRules?: RoutingRule[]
   ) {
     this.getEntries = getEntries;
     this.timeout = timeout;
     this.maxRetries = maxRetries;
     this.debug = debug;
+    this.routingRules = routingRules;
   }
 
   /**
@@ -98,6 +102,7 @@ class Completions {
       timeout: this.timeout,
       maxRetries: this.maxRetries,
       debug: this.debug,
+      routingRules: this.routingRules,
     });
   }
 }
@@ -111,9 +116,10 @@ class Chat {
     getEntries: () => Promise<VaultEntry[]>,
     timeout: number,
     maxRetries: number,
-    debug: boolean
+    debug: boolean,
+    routingRules?: RoutingRule[]
   ) {
-    this.completions = new Completions(getEntries, timeout, maxRetries, debug);
+    this.completions = new Completions(getEntries, timeout, maxRetries, debug, routingRules);
   }
 }
 
@@ -176,7 +182,8 @@ export class KeyKing {
       () => this.getEntries(),
       timeout,
       maxRetries,
-      this.debug
+      this.debug,
+      config.routingRules
     );
   }
 

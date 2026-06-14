@@ -31,7 +31,10 @@ export default function SDKClientPage() {
 <span className="text-neutral-500 italic">// Decrypts lazily on the first API call</span>{`\n`}
 <span className="text-[#ff2a85] font-bold">const</span> keyking = <span className="text-[#ff2a85] font-bold">new</span> KeyKing({`{\n`}
  vault: process.env.KEYKING_VAULT,{`\n`}
- password: process.env.KEYKING_PASSWORD{`\n`}
+ password: process.env.KEYKING_PASSWORD,{`\n`}
+ routingRules: [
+   {`{ provider: `}<span className="text-[#00e676]">"Anthropic"</span>{`, model: `}<span className="text-[#00e676]">"claude-3-5-sonnet-20241022"</span>{` }`}{`\n`}
+ ]{`\n`}
 {`});`}
  </pre>
  </div>

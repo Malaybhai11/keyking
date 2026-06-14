@@ -27,10 +27,19 @@ response = client.chat.completions.create(
 import { KeyKing } from "keyking-sdk";
 
 // The vault.kk file is exported from the KeyKing Desktop App Control Plane
-const kk = new KeyKing({ vaultPath: "./vault.kk" });
+const kk = new KeyKing({ 
+    vaultPath: "./vault.kk",
+    // ALWAYS configure the Priority Ladder for production resilience
+    routingRules: [
+        { provider: "Groq", model: "llama-3.3-70b-versatile" },
+        { provider: "Anthropic", model: "claude-3-5-sonnet-20241022" },
+        { provider: "OpenAI", model: "gpt-4o" }
+    ]
+});
 
+// The model parameter is ignored if routingRules are set.
 const response = await kk.chat.completions.create({
-    model: "gpt-4o",
+    model: "any-model",
     messages: [{ role: "user", content: "Hello from the edge!" }]
 });
 ```

@@ -1,6 +1,7 @@
 import type {
   Provider,
   ProviderConfig,
+  RoutingRule,
   VaultEntry,
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -236,6 +237,7 @@ export interface RouterConfig {
   timeout: number;
   maxRetries: number;
   debug: boolean;
+  routingRules?: RoutingRule[];
 }
 
 async function sendToProvider(
@@ -382,12 +384,7 @@ export async function routeRequest(
   config: RouterConfig
 ): Promise<ChatCompletionResponse | AsyncGenerator<ChatCompletionChunk, void, unknown>> {
   const originalModel = request.model;
-  const primaryProvider = resolveProvider(originalModel);
-
-  if (!primaryProvider) {
-    throw new NoProviderError(originalModel);
-  }
-
+  
   const providerKeys = new Map<string, string[]>();
   for (const entry of vaultEntries) {
     if (!providerKeys.has(entry.provider)) providerKeys.set(entry.provider, []);
@@ -396,33 +393,42 @@ export async function routeRequest(
 
   const attempts: { provider: Provider; model: string; key: string }[] = [];
 
-  const primaryKeys = providerKeys.get(primaryProvider);
-  if (primaryKeys) {
-    const validKeys = primaryKeys.filter(k => globalCircuitBreaker.isAvailable(k));
-    const sortedKeys = globalQuotaMap.sortKeys(validKeys);
-    for (const key of sortedKeys) {
-      attempts.push({ provider: primaryProvider, model: originalModel, key });
+  if (config.routingRules && config.routingRules.length > 0) {
+    for (const rule of config.routingRules) {
+      const keys = providerKeys.get(rule.provider);
+      if (!keys || keys.length === 0) continue;
+
+      const validKeys = keys.filter(k => globalCircuitBreaker.isAvailable(k));
+      const sortedKeys = globalQuotaMap.sortKeys(validKeys);
+      for (const key of sortedKeys) {
+        attempts.push({ provider: rule.provider, model: rule.model, key });
+      }
     }
-  }
-
-  const fallbacks = getFallbackProviders(primaryProvider);
-  for (const fallbackProvider of fallbacks) {
-    const keys = providerKeys.get(fallbackProvider);
-    if (!keys) continue;
-
-    let targetModel = originalModel;
-    if (fallbackProvider === "Groq" && primaryProvider === "OpenAI") {
-      const groqModel = mapToGroqModel(originalModel);
-      if (groqModel) targetModel = groqModel;
-    } else if (fallbackProvider === "Anthropic" && primaryProvider === "OpenAI") {
-      const anthropicModel = mapToAnthropicModel(originalModel);
-      if (anthropicModel) targetModel = anthropicModel;
+  } else {
+    const primaryProvider = resolveProvider(originalModel);
+    if (!primaryProvider) {
+      throw new NoProviderError(originalModel);
     }
     
-    const validKeys = keys.filter(k => globalCircuitBreaker.isAvailable(k));
-    const sortedKeys = globalQuotaMap.sortKeys(validKeys);
-    for (const key of sortedKeys) {
-      attempts.push({ provider: fallbackProvider, model: targetModel, key });
+    const order = [primaryProvider, ...getFallbackProviders(primaryProvider)];
+    for (const provider of order) {
+      const keys = providerKeys.get(provider);
+      if (!keys || keys.length === 0) continue;
+
+      let targetModel = originalModel;
+      if (provider !== primaryProvider) {
+        if (provider === "Groq") {
+          targetModel = mapToGroqModel(originalModel) || originalModel;
+        } else if (provider === "Anthropic") {
+          targetModel = mapToAnthropicModel(originalModel) || originalModel;
+        }
+      }
+      
+      const validKeys = keys.filter(k => globalCircuitBreaker.isAvailable(k));
+      const sortedKeys = globalQuotaMap.sortKeys(validKeys);
+      for (const key of sortedKeys) {
+        attempts.push({ provider, model: targetModel, key });
+      }
     }
   }
 

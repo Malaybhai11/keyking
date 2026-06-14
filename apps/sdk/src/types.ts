@@ -163,6 +163,11 @@ export interface AnthropicResponse {
 
 // ─── SDK Configuration ──────────────────────────────────────────────────────
 
+export interface RoutingRule {
+  provider: Provider;
+  model: string;
+}
+
 export interface KeyKingConfig {
   /**
    * The encrypted vault string exported from the KeyKing desktop app.
@@ -187,6 +192,13 @@ export interface KeyKingConfig {
    * Defaults to 3.
    */
   maxRetries?: number;
+
+  /**
+   * Strict routing rules array mapping specific providers to target models.
+   * Mirrors the KeyKing Desktop App's priority fallback architecture.
+   * If provided, the SDK strictly follows this chain instead of auto-mapping.
+   */
+  routingRules?: RoutingRule[];
 
   /**
    * Enable debug logging to stderr.

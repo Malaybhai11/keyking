@@ -16,10 +16,10 @@ export default function SDKRoutingPage() {
  <section className="space-y-6">
  <h2 className="font-display font-black text-2xl uppercase text-black flex items-center gap-3">
  <Zap className="w-6 h-6 text-[#fde047]" />
- Cross-Provider Fallback
+ The Priority Ladder (Zero-Trust Fallbacks)
  </h2>
  <p className="text-sm font-medium text-neutral-700 leading-relaxed">
- If an API call fails with a retryable error (like a 429 Rate Limit or 5xx Server Error), the SDK's smart router instantly tries the next available key for that provider. If all keys fail, it autonomously falls back to equivalent models on other providers (e.g., failing over from <code>gpt-4o</code> to <code>llama-3.3-70b-versatile</code> on Groq, or <code>claude-3-5-sonnet</code>).
+ By default, the SDK automatically maps failing requests to equivalent models on other providers. But for production resilience, you can define an exact <strong>Priority Ladder</strong>. If the primary provider hits a 429 Rate Limit or 5xx Server Error, the SDK instantly cascades down your predefined chain of Provider-Model pairings.
  </p>
  
  <div className="border-[3px] border-black bg-black p-6 relative group">
@@ -27,11 +27,18 @@ export default function SDKRoutingPage() {
  TypeScript
  </div>
  <pre className="font-mono text-sm leading-relaxed text-[#eaeaea] overflow-x-auto pt-4">
-<span className="text-[#ff2a85] font-bold">const</span> response = <span className="text-[#ff2a85] font-bold">await</span> keyking.chat.completions.create({`{\n`}
- model: <span className="text-[#00e676]">"gpt-4o"</span>,{`\n`}
- messages: [{`{ role: `}<span className="text-[#00e676]">"user"</span>{`, content: `}<span className="text-[#00e676]">"Hello!"</span>{` }`}],{`\n`}
+<span className="text-[#ff2a85] font-bold">const</span> keyking = <span className="text-[#ff2a85] font-bold">new</span> KeyKing({`{\n`}
+  routingRules: [
+    {`{ provider: `}<span className="text-[#00e676]">"Groq"</span>{`,      model: `}<span className="text-[#00e676]">"llama-3.3-70b-versatile"</span>{` },`}{`\n`}
+    {`{ provider: `}<span className="text-[#00e676]">"Anthropic"</span>{`, model: `}<span className="text-[#00e676]">"claude-3-5-sonnet-20241022"</span>{` },`}{`\n`}
+    {`{ provider: `}<span className="text-[#00e676]">"OpenAI"</span>{`,    model: `}<span className="text-[#00e676]">"gpt-4o"</span>{` }`}{`\n`}
+  ]
 {`});\n\n`}
-<span className="text-neutral-500 italic">// Verify which provider handled the fallback</span>{`\n`}
+<span className="text-[#ff2a85] font-bold">const</span> response = <span className="text-[#ff2a85] font-bold">await</span> keyking.chat.completions.create({`{\n`}
+  model: <span className="text-[#00e676]">"any-model"</span>, <span className="text-neutral-500 italic">// Ignored when routingRules are set</span>{`\n`}
+  messages: [{`{ role: `}<span className="text-[#00e676]">"user"</span>{`, content: `}<span className="text-[#00e676]">"Hello!"</span>{` }`}],{`\n`}
+{`});\n\n`}
+<span className="text-neutral-500 italic">// Verify which provider handled the request</span>{`\n`}
 console.log(response._keyking_provider); 
  </pre>
  </div>

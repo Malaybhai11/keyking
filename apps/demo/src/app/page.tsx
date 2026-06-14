@@ -14,6 +14,12 @@ export default function Home() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Settings State
+  const [model, setModel] = useState('gpt-4o');
+  const [priorities, setPriorities] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -37,10 +43,24 @@ export default function Home() {
       // Create request payload formatted for OpenAI compatibility
       const payload = messages.map(m => ({ role: m.role, content: m.content })).concat({ role: 'user', content: userMessage });
       
+      // Parse routing rules format: "Groq:llama-3.3-70b-versatile, Anthropic:claude-3-5-sonnet-20241022"
+      const parsedPriorities = priorities
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => {
+          const [provider, rModel] = s.split(':').map(x => x.trim());
+          return { provider, model: rModel || model }; // fallback to requested model if no model specified
+        });
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: payload }),
+        body: JSON.stringify({ 
+          messages: payload,
+          model: model,
+          routingRules: parsedPriorities
+        }),
       });
 
       const data = await res.json();
@@ -49,7 +69,7 @@ export default function Home() {
         setMessages(prev => [...prev, { 
           role: 'assistant', 
           content: data.choices[0].message.content,
-          provider: data.model || 'Unknown Provider'
+          provider: data._keyking_provider || 'Unknown Provider'
         }]);
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${data.error || 'Failed to fetch response'}` }]);
@@ -88,7 +108,38 @@ export default function Home() {
           <p className="text-gray-400 text-center max-w-lg">
             This entire application runs on the edge. No proxy server required. Keys are decrypted on the fly.
           </p>
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className="text-amber-500 text-xs hover:underline mt-2 opacity-80"
+          >
+            {showSettings ? "Hide Settings" : "Configure Routing Priorities"}
+          </button>
         </div>
+
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className="mb-4 bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-lg flex flex-col md:flex-row gap-4 items-center animate-in fade-in slide-in-from-top-2">
+            <div className="flex-1 w-full">
+              <label className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-1 block">Target Model</label>
+              <input 
+                type="text" 
+                value={model} 
+                onChange={e => setModel(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="flex-[2] w-full">
+              <label className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-1 block">Custom Fallback Priority Order</label>
+              <input 
+                type="text" 
+                value={priorities} 
+                onChange={e => setPriorities(e.target.value)}
+                placeholder="e.g. Groq:llama-3.3-70b-versatile, Anthropic:claude-3-5-sonnet-20241022"
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-amber-500 font-mono focus:outline-none focus:border-amber-500"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Chat Container */}
         <div className="flex-1 overflow-hidden flex flex-col bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.4)]">
