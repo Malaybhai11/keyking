@@ -94,13 +94,15 @@ keyking dev -- python main.py
 Install the SDK into your Node.js or Next.js project:
 
 ```bash
-npm install @keyking/sdk
+npm install keyking-sdk
 ```
+
+The published SDK package name is `keyking-sdk`.
 
 Decrypt your vault on the fly in your serverless functions or edge middleware:
 
 ```typescript
-import { KeyKing } from '@keyking/sdk';
+import { KeyKing } from 'keyking-sdk';
 
 // Initialize with your single Master Password
 const kk = new KeyKing(process.env.KEYKING_MASTER_PASSWORD);
