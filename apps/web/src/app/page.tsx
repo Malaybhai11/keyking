@@ -285,6 +285,7 @@ console.log(response.choices[0].message.content);`
         </nav>
       </header>
 
+      <main role="main" id="main-content">
       {/* HERO SECTION */}
       <section className="max-w-7xl mx-auto px-4 md:px-8 pt-3 pb-8 lg:py-6 lg:min-h-[calc(100vh-140px)] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
         
@@ -951,6 +952,8 @@ console.log(response.choices[0].message.content);`
         </div>
 
       </section>
+
+      </main>
 
       {/* FOOTER */}
       <footer className="max-w-7xl mx-auto px-4 md:px-8 pt-8 border-t-[3px] border-black text-center flex flex-col sm:flex-row items-center justify-between gap-4">

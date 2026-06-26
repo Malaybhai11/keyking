@@ -496,8 +496,65 @@ if [ "$OS" = "windows" ]; then
     chmod +x "$WIN_BIN_DIR/$APP_NAME"*
     FINAL_PATH="$WIN_BIN_DIR/$APP_NAME"
 
+    # Create Claude wrapper (Bash for Git Bash)
+    CLAUDE_WRAPPER_BASH="${WIN_BIN_DIR}/keyking-claude"
+    cat << 'EOF' > "$TMP_DIR/keyking-claude"
+#!/usr/bin/env bash
+if ! command -v claude &> /dev/null; then
+    echo "Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code"
+    exit 1
+fi
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
+export ANTHROPIC_API_KEY="kk-zero-config"
+unset AWS_PROFILE
+unset AWS_ACCESS_KEY_ID
+unset AWS_REGION
+echo "👑 Routing Claude Code through KeyKing..."
+exec claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' "$@"
+EOF
+    cp "$TMP_DIR/keyking-claude" "$CLAUDE_WRAPPER_BASH"
+    chmod +x "$CLAUDE_WRAPPER_BASH"
+
+    # Create Claude wrapper (CMD for command prompt)
+    CLAUDE_WRAPPER_CMD="${WIN_BIN_DIR}/keyking-claude.cmd"
+    cat << 'EOF' > "$TMP_DIR/keyking-claude.cmd"
+@echo off
+setlocal
+where claude >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code
+    exit /b 1
+)
+set ANTHROPIC_BASE_URL=http://127.0.0.1:8787
+set ANTHROPIC_API_KEY=kk-zero-config
+set AWS_PROFILE=
+set AWS_ACCESS_KEY_ID=
+set AWS_REGION=
+echo 👑 Routing Claude Code through KeyKing...
+claude --settings "{\"env\":{\"CLAUDE_CODE_USE_BEDROCK\":\"0\",\"CLAUDE_CODE_USE_VERTEX\":\"0\"}}" %*
+endlocal
+EOF
+    cp "$TMP_DIR/keyking-claude.cmd" "$CLAUDE_WRAPPER_CMD"
+
+    # Create Claude wrapper (PS1 for PowerShell)
+    CLAUDE_WRAPPER_PS1="${WIN_BIN_DIR}/keyking-claude.ps1"
+    cat << 'EOF' > "$TMP_DIR/keyking-claude.ps1"
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Write-Error "Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code"
+    exit 1
+}
+$env:ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
+$env:ANTHROPIC_API_KEY="kk-zero-config"
+Remove-Item env:AWS_PROFILE -ErrorAction SilentlyContinue
+Remove-Item env:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
+Remove-Item env:AWS_REGION -ErrorAction SilentlyContinue
+Write-Host "👑 Routing Claude Code through KeyKing..."
+claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' $args
+EOF
+    cp "$TMP_DIR/keyking-claude.ps1" "$CLAUDE_WRAPPER_PS1"
+
     (sleep 0.5) &
-    spinner "Copying binary to ${BR_YELLOW}${WIN_BIN_DIR}${RESET}" $!
+    spinner "Copying binary and creating Claude wrappers in ${BR_YELLOW}${WIN_BIN_DIR}${RESET}" $!
 
     echo ""
     echo -e "  ${BR_YELLOW}⚠${RESET}  Please add ${BR_CYAN}${WIN_BIN_DIR}${RESET} to your Windows PATH"

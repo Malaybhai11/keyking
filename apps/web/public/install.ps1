@@ -306,10 +306,30 @@ $possiblePaths = @(
     "$env:LOCALAPPDATA\keyking\keyking.exe",
     "$env:PROGRAMFILES\keyking\keyking.exe"
 )
-$appExe = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+# Wait and retry up to 5 times to detect the installed executable
+$appExe = $null
+for ($i = 0; $i -lt 5; $i++) {
+    $appExe = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($appExe) { break }
+    Start-Sleep -Seconds 2
+}
 
 if ($appExe) {
     $appDir = Split-Path $appExe -Parent
+    
+    # Create keyking command wrappers if the executable is named "Key King.exe"
+    if ((Split-Path $appExe -Leaf) -eq "Key King.exe") {
+        $keykingCmd = Join-Path $appDir "keyking.cmd"
+        $keykingCmdContent = "@echo off`r`n`"$appExe`" %*"
+        Set-Content -Path $keykingCmd -Value $keykingCmdContent -Encoding UTF8 -ErrorAction SilentlyContinue
+
+        $keykingPs = Join-Path $appDir "keyking.ps1"
+        $keykingPsContent = "& `"$appExe`" `$args"
+        Set-Content -Path $keykingPs -Value $keykingPsContent -Encoding UTF8 -ErrorAction SilentlyContinue
+    }
+
+    # Create Claude wrapper (CMD)
     $claudeCmd = Join-Path $appDir "keyking-claude.cmd"
     $cmdContent = @"
 @echo off
@@ -325,10 +345,41 @@ set AWS_PROFILE=
 set AWS_ACCESS_KEY_ID=
 set AWS_REGION=
 echo 👑 Routing Claude Code through KeyKing...
-claude --settings "{\""env\"":{\""CLAUDE_CODE_USE_BEDROCK\"":\""0\"\",\""CLAUDE_CODE_USE_VERTEX\"":\""0\""}}" %*
+claude --settings "{\"env\":{\"CLAUDE_CODE_USE_BEDROCK\":\"0\",\"CLAUDE_CODE_USE_VERTEX\":\"0\"}}" %*
 endlocal
 "@
     Set-Content -Path $claudeCmd -Value $cmdContent -Encoding UTF8 -ErrorAction SilentlyContinue
+
+    # Create Claude wrapper (PowerShell)
+    $claudePs = Join-Path $appDir "keyking-claude.ps1"
+    $psContent = @"
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Write-Error "Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code"
+    exit 1
+}
+`$env:ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
+`$env:ANTHROPIC_API_KEY="kk-zero-config"
+Remove-Item env:AWS_PROFILE -ErrorAction SilentlyContinue
+Remove-Item env:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
+Remove-Item env:AWS_REGION -ErrorAction SilentlyContinue
+Write-Host "👑 Routing Claude Code through KeyKing..."
+claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' `$args
+"@
+    Set-Content -Path $claudePs -Value $psContent -Encoding UTF8 -ErrorAction SilentlyContinue
+
+    # Add to User PATH
+    $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+    if ($userPath -split ';' -notcontains $appDir) {
+        $newUserPath = $userPath
+        if ($newUserPath -and -not $newUserPath.EndsWith(';')) {
+            $newUserPath += ";"
+        }
+        $newUserPath += $appDir
+        [Environment]::SetEnvironmentVariable("PATH", $newUserPath, "User")
+        $env:PATH += ";$appDir"
+        Write-Host "  ✔ Added KeyKing to User PATH ($appDir)" -ForegroundColor Green
+    }
+
     Write-Host "  ✔ Registering shell integrations (keyking-claude)" -ForegroundColor Green
 }
 

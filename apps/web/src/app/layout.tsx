@@ -31,8 +31,22 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "KeyKing | Free Claude Code & Zero-Trust AI API",
-    description: "Aggregate free AI APIs and run Claude Code for free. Manage your API keys locally with zero trust. Never hit an LLM rate limit again.",
+    title: "KeyKing | Zero-Trust AI API Load Balancer",
+    description: "Implement multi-provider redundancy and local failover routing. Manage your API keys locally with zero trust. Ensure 100% uptime for your AI apps.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  verification: {
+    google: "e-keyking-verification-id", // Placeholder for actual GSC tag
   }
 };
 
@@ -46,23 +60,33 @@ export default function RootLayout({
 }>) {
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "KeyKing",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "Windows, macOS, Linux",
-    "url": "https://keyking.ledgion.in",
-    "description": "KeyKing is the ultimate Zero-Trust LLM API aggregator. Manage API Keys locally and bypass rate limits.",
-    "offers": {
-      "@type": "Offer",
-      "price": "0.00",
-      "priceCurrency": "USD"
-    },
-    "publisher": {
-      "@type": "Organization",
-      "name": "KeyKing",
-      "url": "https://keyking.ledgion.in",
-      "logo": "https://keyking.ledgion.in/icon.png"
-    }
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "KeyKing AI Proxy",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "url": "https://keyking.ledgion.in",
+        "description": "KeyKing is the ultimate Zero-Trust LLM API proxy. Manage API Keys locally, implement intelligent fallback routing, and integrate seamlessly with your CLI tools for 100% uptime.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0.00",
+          "priceCurrency": "USD"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "KeyKing Ecosystem",
+          "url": "https://keyking.ledgion.in",
+          "logo": "https://keyking.ledgion.in/icon.png"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "url": "https://keyking.ledgion.in",
+        "name": "KeyKing Ecosystem",
+        "description": "Intelligent AI API Load Balancing and Failover Routing."
+      }
+    ]
   };
 
   return (
