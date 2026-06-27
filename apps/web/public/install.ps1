@@ -291,97 +291,184 @@ if ($proc.ExitCode -ne 0) {
 Write-Joke
 
 # ─── STEP 5 ───
-Write-Step "5" "6" "Finalizing Installation"
+Write-Step "5" "6" "Registering CLI Commands"
 
 Remove-Item -Path $TMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "  ✔ Cleaning temporary files" -ForegroundColor Green
 
-# Create Claude wrapper
+# ── Always create CLI wrappers in a dedicated, guaranteed directory ──
+# This does NOT depend on finding the Tauri GUI app.
+$CLI_DIR = "$env:LOCALAPPDATA\keyking\bin"
+New-Item -ItemType Directory -Force -Path $CLI_DIR | Out-Null
+
+# ── Detect Tauri GUI app (best-effort, used for keyking shim + launch) ──
 $possiblePaths = @(
     "$env:LOCALAPPDATA\$PRODUCT\Key King.exe",
     "$env:LOCALAPPDATA\Key King\Key King.exe",
+    "$env:LOCALAPPDATA\Programs\$PRODUCT\Key King.exe",
+    "$env:LOCALAPPDATA\Programs\Key King\Key King.exe",
     "$env:PROGRAMFILES\$PRODUCT\Key King.exe",
     "$env:PROGRAMFILES\Key King\Key King.exe",
     "${env:PROGRAMFILES(X86)}\$PRODUCT\Key King.exe",
+    "${env:PROGRAMFILES(X86)}\Key King\Key King.exe",
     "$env:LOCALAPPDATA\keyking\keyking.exe",
     "$env:PROGRAMFILES\keyking\keyking.exe"
 )
 
-# Wait and retry up to 5 times to detect the installed executable
 $appExe = $null
-for ($i = 0; $i -lt 5; $i++) {
+for ($i = 0; $i -lt 8; $i++) {
     $appExe = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($appExe) { break }
+    Write-Host "`r  ▸ Waiting for installer to finish... ($($i+1)/8)" -NoNewline -ForegroundColor Yellow
     Start-Sleep -Seconds 2
 }
+Write-Host ""
 
 if ($appExe) {
-    $appDir = Split-Path $appExe -Parent
-    
-    # Create keyking command wrappers if the executable is named "Key King.exe"
-    if ((Split-Path $appExe -Leaf) -eq "Key King.exe") {
-        $keykingCmd = Join-Path $appDir "keyking.cmd"
-        $keykingCmdContent = "@echo off`r`n`"$appExe`" %*"
-        Set-Content -Path $keykingCmd -Value $keykingCmdContent -Encoding UTF8 -ErrorAction SilentlyContinue
+    Write-Host "  ✔ Found KeyKing at: $appExe" -ForegroundColor Green
 
-        $keykingPs = Join-Path $appDir "keyking.ps1"
-        $keykingPsContent = "& `"$appExe`" `$args"
-        Set-Content -Path $keykingPs -Value $keykingPsContent -Encoding UTF8 -ErrorAction SilentlyContinue
-    }
+    # Create keyking.cmd shim so "keyking" works from any terminal
+    $keykingCmdShim = Join-Path $CLI_DIR "keyking.cmd"
+    @"
+@echo off
+"$appExe" %*
+"@ | Set-Content -Path $keykingCmdShim -Encoding ASCII
 
-    # Create Claude wrapper (CMD)
-    $claudeCmd = Join-Path $appDir "keyking-claude.cmd"
-    $cmdContent = @"
+    # Create keyking.ps1 shim for PowerShell
+    $keykingPsShim = Join-Path $CLI_DIR "keyking.ps1"
+    @"
+& "$appExe" `$args
+"@ | Set-Content -Path $keykingPsShim -Encoding UTF8
+
+    Write-Host "  ✔ Created keyking command shim" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Could not locate KeyKing desktop app (it may need a reboot to register)." -ForegroundColor Yellow
+    Write-Host "    The keyking-claude wrapper will still work independently." -ForegroundColor Yellow
+}
+
+# ── Create keyking-claude.cmd (works from CMD and PowerShell) ──
+$claudeCmdPath = Join-Path $CLI_DIR "keyking-claude.cmd"
+@"
 @echo off
 setlocal
+
+REM Check if claude is installed
 where claude >nul 2>nul
 if %ERRORLEVEL% neq 0 (
-    echo Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code
-    exit /b 1
+    echo.
+    echo   Claude Code CLI not found. Installing it now...
+    echo.
+    where npm >nul 2>nul
+    if %ERRORLEVEL% neq 0 (
+        echo   ERROR: npm is not installed. Please install Node.js first from https://nodejs.org
+        echo   Then run: npm install -g @anthropic-ai/claude-code
+        exit /b 1
+    )
+    npm install -g @anthropic-ai/claude-code
+    where claude >nul 2>nul
+    if %ERRORLEVEL% neq 0 (
+        echo   ERROR: claude-code installation failed. Try manually: npm install -g @anthropic-ai/claude-code
+        exit /b 1
+    )
+    echo   Claude Code CLI installed successfully!
+    echo.
 )
+
 set ANTHROPIC_BASE_URL=http://127.0.0.1:8787
 set ANTHROPIC_API_KEY=kk-zero-config
 set AWS_PROFILE=
 set AWS_ACCESS_KEY_ID=
 set AWS_REGION=
-echo 👑 Routing Claude Code through KeyKing...
+
+echo.
+echo   [KeyKing] Routing Claude Code through KeyKing proxy...
+echo.
 claude --settings "{\"env\":{\"CLAUDE_CODE_USE_BEDROCK\":\"0\",\"CLAUDE_CODE_USE_VERTEX\":\"0\"}}" %*
 endlocal
-"@
-    Set-Content -Path $claudeCmd -Value $cmdContent -Encoding UTF8 -ErrorAction SilentlyContinue
+"@ | Set-Content -Path $claudeCmdPath -Encoding ASCII
 
-    # Create Claude wrapper (PowerShell)
-    $claudePs = Join-Path $appDir "keyking-claude.ps1"
-    $psContent = @"
+Write-Host "  ✔ Created keyking-claude.cmd" -ForegroundColor Green
+
+# ── Create keyking-claude.ps1 (native PowerShell wrapper) ──
+$claudePsPath = Join-Path $CLI_DIR "keyking-claude.ps1"
+@"
+# KeyKing Claude Code Wrapper (PowerShell)
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-    Write-Error "Claude Code CLI not found. Install it first: npm install -g @anthropic-ai/claude-code"
-    exit 1
+    Write-Host ""
+    Write-Host "  Claude Code CLI not found. Installing it now..." -ForegroundColor Yellow
+    Write-Host ""
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Error "npm is not installed. Please install Node.js first from https://nodejs.org"
+        Write-Host "  Then run: npm install -g @anthropic-ai/claude-code" -ForegroundColor Yellow
+        exit 1
+    }
+    npm install -g @anthropic-ai/claude-code
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+        Write-Error "claude-code installation failed. Try manually: npm install -g @anthropic-ai/claude-code"
+        exit 1
+    }
+    Write-Host "  Claude Code CLI installed successfully!" -ForegroundColor Green
+    Write-Host ""
 }
-`$env:ANTHROPIC_BASE_URL="http://127.0.0.1:8787"
-`$env:ANTHROPIC_API_KEY="kk-zero-config"
+
+`$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"
+`$env:ANTHROPIC_API_KEY = "kk-zero-config"
 Remove-Item env:AWS_PROFILE -ErrorAction SilentlyContinue
 Remove-Item env:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
 Remove-Item env:AWS_REGION -ErrorAction SilentlyContinue
-Write-Host "👑 Routing Claude Code through KeyKing..."
-claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' `$args
-"@
-    Set-Content -Path $claudePs -Value $psContent -Encoding UTF8 -ErrorAction SilentlyContinue
 
-    # Add to User PATH
-    $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-    if ($userPath -split ';' -notcontains $appDir) {
-        $newUserPath = $userPath
-        if ($newUserPath -and -not $newUserPath.EndsWith(';')) {
-            $newUserPath += ";"
-        }
-        $newUserPath += $appDir
-        [Environment]::SetEnvironmentVariable("PATH", $newUserPath, "User")
-        $env:PATH += ";$appDir"
-        Write-Host "  ✔ Added KeyKing to User PATH ($appDir)" -ForegroundColor Green
-    }
+Write-Host ""
+Write-Host "  [KeyKing] Routing Claude Code through KeyKing proxy..." -ForegroundColor Magenta
+Write-Host ""
+claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' @args
+"@ | Set-Content -Path $claudePsPath -Encoding UTF8
 
-    Write-Host "  ✔ Registering shell integrations (keyking-claude)" -ForegroundColor Green
+Write-Host "  ✔ Created keyking-claude.ps1" -ForegroundColor Green
+
+# ── Register CLI_DIR on User PATH (persistent + current session) ──
+$userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$pathEntries = @()
+if ($userPath) { $pathEntries = $userPath -split ';' | Where-Object { $_ -ne '' } }
+
+if ($pathEntries -notcontains $CLI_DIR) {
+    $newPath = ($pathEntries + $CLI_DIR) -join ';'
+    [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+    Write-Host "  ✔ Added $CLI_DIR to User PATH (persistent)" -ForegroundColor Green
 }
+
+# Also update current session so the command works immediately
+if ($env:PATH -notlike "*$CLI_DIR*") {
+    $env:PATH = "$CLI_DIR;$env:PATH"
+}
+
+# Also add the Tauri app dir to PATH if it's different from CLI_DIR
+if ($appExe) {
+    $appDir = Split-Path $appExe -Parent
+    if ($appDir -ne $CLI_DIR) {
+        $pathEntries2 = ([Environment]::GetEnvironmentVariable("PATH", "User")) -split ';' | Where-Object { $_ -ne '' }
+        if ($pathEntries2 -notcontains $appDir) {
+            $newPath2 = ($pathEntries2 + $appDir) -join ';'
+            [Environment]::SetEnvironmentVariable("PATH", $newPath2, "User")
+        }
+        if ($env:PATH -notlike "*$appDir*") {
+            $env:PATH = "$appDir;$env:PATH"
+        }
+    }
+}
+
+Write-Host "  ✔ Shell integrations registered (keyking-claude)" -ForegroundColor Green
+Write-Host ""
+
+# Verify the commands are accessible
+Write-Host "  ── Verification ──" -ForegroundColor Cyan
+$testCmd = Get-Command keyking-claude -ErrorAction SilentlyContinue
+if ($testCmd) {
+    Write-Host "  ✔ keyking-claude is accessible from this session" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ keyking-claude will be available in NEW terminal windows" -ForegroundColor Yellow
+    Write-Host "    Location: $CLI_DIR" -ForegroundColor Yellow
+}
+Write-Host ""
 
 Show-SimulatedProgress "Finalizing..." 20
 Write-Host ""
@@ -406,13 +493,14 @@ Write-Host ""
 Write-Hr
 Write-Host ""
 
-$resolvedPath = if ($appExe) { $appExe } else { "Desktop Shortcut" }
+$resolvedPath = if ($appExe) { $appExe } else { "Desktop Shortcut / Start Menu" }
 
 Write-Host "  ██████████████████████████████████████████████████████████████" -ForegroundColor Yellow
 Write-Host "  █  " -NoNewline -ForegroundColor Yellow; Write-Host "Installation Summary" -NoNewline -ForegroundColor White; Write-Host "                                    █" -ForegroundColor Yellow
 Write-Host "  ██████████████████████████████████████████████████████████████" -ForegroundColor Yellow
 Write-Host "  █  ● " -NoNewline -ForegroundColor Yellow; Write-Host "Version    " -NoNewline -ForegroundColor Yellow; Write-Host "$version".PadRight(41) -NoNewline -ForegroundColor Cyan; Write-Host "█" -ForegroundColor Yellow
-Write-Host "  █  ● " -NoNewline -ForegroundColor Yellow; Write-Host "Binary     " -NoNewline -ForegroundColor Yellow; Write-Host "$resolvedPath".PadRight(41) -NoNewline -ForegroundColor Cyan; Write-Host "█" -ForegroundColor Yellow
+Write-Host "  █  ● " -NoNewline -ForegroundColor Yellow; Write-Host "Desktop    " -NoNewline -ForegroundColor Yellow; Write-Host "$resolvedPath".PadRight(41) -NoNewline -ForegroundColor Cyan; Write-Host "█" -ForegroundColor Yellow
+Write-Host "  █  ● " -NoNewline -ForegroundColor Yellow; Write-Host "CLI Tools  " -NoNewline -ForegroundColor Yellow; Write-Host "$CLI_DIR".PadRight(41) -NoNewline -ForegroundColor Cyan; Write-Host "█" -ForegroundColor Yellow
 Write-Host "  █  ● " -NoNewline -ForegroundColor Yellow; Write-Host "Config     " -NoNewline -ForegroundColor Yellow; Write-Host "$configFile".PadRight(41) -NoNewline -ForegroundColor Cyan; Write-Host "█" -ForegroundColor Yellow
 Write-Host "  █  ● " -NoNewline -ForegroundColor Yellow; Write-Host "Proxy Port " -NoNewline -ForegroundColor Yellow; Write-Host "8787".PadRight(41) -NoNewline -ForegroundColor Cyan; Write-Host "█" -ForegroundColor Yellow
 Write-Host "  ██████████████████████████████████████████████████████████████" -ForegroundColor Yellow
@@ -420,14 +508,16 @@ Write-Host ""
 
 Write-Host "  Quick Start:" -ForegroundColor White
 Write-Host ""
+Write-Host "    # Use Claude Code routed through KeyKing (auto-installs if needed)" -ForegroundColor Yellow
+Write-Host "    > keyking-claude" -ForegroundColor Cyan
+Write-Host ""
 Write-Host "    # Start the zero-trust LLM proxy" -ForegroundColor Yellow
 Write-Host "    > keyking dev" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "    # Route requests through KeyKing" -ForegroundColor Yellow
 Write-Host "    > curl http://localhost:8787/v1/chat/completions ..." -ForegroundColor Cyan
 Write-Host ""
-Write-Host "    # Use Claude Code with Zero-Config" -ForegroundColor Yellow
-Write-Host "    > keyking-claude" -ForegroundColor Cyan
+Write-Host "  NOTE: If 'keyking-claude' is not found, open a NEW terminal window." -ForegroundColor Yellow
 Write-Host ""
 
 Write-Hr
