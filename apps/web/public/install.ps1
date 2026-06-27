@@ -334,11 +334,9 @@ if ($appExe) {
 "$appExe" %*
 "@ | Set-Content -Path $keykingCmdShim -Encoding ASCII
 
-    # Create keyking.ps1 shim for PowerShell
-    $keykingPsShim = Join-Path $CLI_DIR "keyking.ps1"
-    @"
-& "$appExe" `$args
-"@ | Set-Content -Path $keykingPsShim -Encoding UTF8
+    # Clean up old .ps1 shims that conflict with PowerShell Execution Policies
+    $oldPsShim = Join-Path $CLI_DIR "keyking.ps1"
+    if (Test-Path $oldPsShim) { Remove-Item $oldPsShim -Force -ErrorAction SilentlyContinue }
 
     Write-Host "  ✔ Created keyking command shim" -ForegroundColor Green
 } else {
@@ -389,41 +387,9 @@ endlocal
 
 Write-Host "  ✔ Created keyking-claude.cmd" -ForegroundColor Green
 
-# ── Create keyking-claude.ps1 (native PowerShell wrapper) ──
-$claudePsPath = Join-Path $CLI_DIR "keyking-claude.ps1"
-@"
-# KeyKing Claude Code Wrapper (PowerShell)
-if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-    Write-Host ""
-    Write-Host "  Claude Code CLI not found. Installing it now..." -ForegroundColor Yellow
-    Write-Host ""
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        Write-Error "npm is not installed. Please install Node.js first from https://nodejs.org"
-        Write-Host "  Then run: npm install -g @anthropic-ai/claude-code" -ForegroundColor Yellow
-        exit 1
-    }
-    npm install -g @anthropic-ai/claude-code
-    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-        Write-Error "claude-code installation failed. Try manually: npm install -g @anthropic-ai/claude-code"
-        exit 1
-    }
-    Write-Host "  Claude Code CLI installed successfully!" -ForegroundColor Green
-    Write-Host ""
-}
-
-`$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"
-`$env:ANTHROPIC_API_KEY = "kk-zero-config"
-Remove-Item env:AWS_PROFILE -ErrorAction SilentlyContinue
-Remove-Item env:AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
-Remove-Item env:AWS_REGION -ErrorAction SilentlyContinue
-
-Write-Host ""
-Write-Host "  [KeyKing] Routing Claude Code through KeyKing proxy..." -ForegroundColor Magenta
-Write-Host ""
-claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX":"0"}}' @args
-"@ | Set-Content -Path $claudePsPath -Encoding UTF8
-
-Write-Host "  ✔ Created keyking-claude.ps1" -ForegroundColor Green
+# ── Clean up old .ps1 wrappers to prevent ExecutionPolicy errors ──
+$oldClaudePsPath = Join-Path $CLI_DIR "keyking-claude.ps1"
+if (Test-Path $oldClaudePsPath) { Remove-Item $oldClaudePsPath -Force -ErrorAction SilentlyContinue }
 
 # ── Register CLI_DIR on User PATH (persistent + current session) ──
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
