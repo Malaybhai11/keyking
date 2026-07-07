@@ -138,7 +138,8 @@ impl ProviderAdapter for AnthropicAdapter {
                 index: 0,
                 message: Message {
                     role: "assistant".to_string(),
-                    content: text_content,
+                    content: Some(text_content),
+                    extra: Default::default(),
                 },
                 finish_reason: Some("stop".to_string()),
             }],

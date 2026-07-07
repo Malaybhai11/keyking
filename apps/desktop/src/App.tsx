@@ -88,11 +88,67 @@ function EventProvider({ children }: { children: ReactNode }) {
   )
 }
 
+interface DirtyContextValue {
+  isDirty: boolean
+  setIsDirty: (dirty: boolean) => void
+  dirtyMessage: string
+  setDirtyMessage: (msg: string) => void
+  showDirtyPrompt: boolean
+  setShowDirtyPrompt: (show: boolean) => void
+}
+
+const DirtyContext = createContext<DirtyContextValue>({
+  isDirty: false,
+  setIsDirty: () => {},
+  dirtyMessage: '',
+  setDirtyMessage: () => {},
+  showDirtyPrompt: false,
+  setShowDirtyPrompt: () => {}
+})
+
+export const useDirty = () => useContext(DirtyContext)
+
+export function DirtyProvider({ children }: { children: ReactNode }) {
+  const [isDirty, setIsDirty] = useState(false)
+  const [dirtyMessage, setDirtyMessage] = useState('')
+  const [showDirtyPrompt, setShowDirtyPrompt] = useState(false)
+
+  return (
+    <DirtyContext.Provider value={{ isDirty, setIsDirty, dirtyMessage, setDirtyMessage, showDirtyPrompt, setShowDirtyPrompt }}>
+      {children}
+      {showDirtyPrompt && (
+        <div className="fixed inset-0 bg-neo-dark/50 flex items-center justify-center p-4 z-[100]">
+          <div className="bg-neo-yellow border-4 border-neo-dark shadow-neo-xl max-w-sm w-full p-6 relative">
+            <h2 className="font-display font-black uppercase text-2xl mb-2 text-neo-dark">Unsaved Changes</h2>
+            <p className="font-bold text-neo-dark/80 mb-6">{dirtyMessage || "Save the models first."}</p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setShowDirtyPrompt(false)} 
+                className="flex-1 bg-neo-pink text-white border-3 border-neo-dark font-display font-black uppercase py-2 hover:-translate-y-1 hover:shadow-neo-md transition-all cursor-pointer"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </DirtyContext.Provider>
+  )
+}
+
 function Sidebar() {
   const { events } = useEvents()
   const recent = events.filter(e => e.success).length
   const posthog = usePostHog()
   const { update } = useUpdateStore()
+  const { isDirty, setShowDirtyPrompt } = useDirty()
+
+  const handleNavClick = (e: React.MouseEvent) => {
+    if (isDirty) {
+      e.preventDefault()
+      setShowDirtyPrompt(true)
+    }
+  }
 
   return (
     <aside className="w-[280px] bg-neo-bg border-r-3 border-neo-dark flex flex-col z-10 relative">
@@ -109,32 +165,32 @@ function Sidebar() {
       </div>
       
       <nav className="flex-1 px-4 py-6 space-y-3 font-display uppercase font-bold text-sm">
-        <NavLink to="/" data-tour="tour-step-0" className={({isActive}) =>
+        <NavLink onClick={handleNavClick} to="/" data-tour="tour-step-0" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <LayoutDashboard className="w-5 h-5" /> Dashboard
         </NavLink>
-        <NavLink to="/keys" data-tour="tour-step-1" className={({isActive}) =>
+        <NavLink onClick={handleNavClick} to="/keys" data-tour="tour-step-1" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <Key className="w-5 h-5" /> Provider Keys
         </NavLink>
-        <NavLink to="/logs" className={({isActive}) =>
+        <NavLink onClick={handleNavClick} to="/logs" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <Activity className="w-5 h-5" /> Routing Logs
         </NavLink>
-        <NavLink to="/priority" data-tour="tour-step-5" className={({isActive}) =>
+        <NavLink onClick={handleNavClick} to="/priority" data-tour="tour-step-5" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <GripVertical className="w-5 h-5" /> Priority
         </NavLink>
-        <NavLink to="/anomalies" className={({isActive}) =>
+        <NavLink onClick={handleNavClick} to="/anomalies" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <ShieldAlert className="w-5 h-5" /> Anomalies
         </NavLink>
-        <NavLink to="/settings" className={({isActive}) =>
+        <NavLink onClick={handleNavClick} to="/settings" className={({isActive}) =>
           `flex items-center gap-3 px-4 py-3 border-3 transition-all duration-200 ${isActive ? 'bg-neo-yellow border-neo-dark shadow-neo-sm translate-x-[-2px] translate-y-[-2px] text-neo-dark' : 'bg-transparent border-transparent text-neo-dark hover:bg-white hover:border-neo-dark hover:shadow-neo-sm'}`
         }>
           <Settings className="w-5 h-5" /> Settings
@@ -322,12 +378,13 @@ function App() {
   }
 
   return (
-    <EventProvider>
-      <TourProvider>
-        <div className="flex h-screen bg-neo-bg text-neo-dark font-body selection:bg-neo-yellow selection:text-neo-dark">
-          <Sidebar />
-          <main className="flex-1 p-8 overflow-auto relative">
-            <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
+    <DirtyProvider>
+      <EventProvider>
+        <TourProvider>
+          <div className="flex h-screen bg-neo-bg text-neo-dark font-body selection:bg-neo-yellow selection:text-neo-dark">
+            <Sidebar />
+            <main className="flex-1 p-8 overflow-auto relative">
+              <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-12">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/keys" element={<KeysPage />} />
@@ -370,6 +427,7 @@ function App() {
         </div>
       </TourProvider>
     </EventProvider>
+    </DirtyProvider>
   )
 }
 

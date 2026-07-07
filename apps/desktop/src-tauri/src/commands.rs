@@ -110,7 +110,7 @@ struct OpenAiModelsResponse {
 
 #[tauri::command]
 pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Result<Vec<ModelInfo>, String> {
-    let mut vault = state.vault.lock().await;
+    let vault = state.vault.lock().await;
     let keys = vault.list_keys();
     let mut provider_keys: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     

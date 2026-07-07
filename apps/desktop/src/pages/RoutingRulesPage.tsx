@@ -18,6 +18,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useDirty } from '../App'
 
 interface RoutingRule {
   provider: string
@@ -84,12 +85,23 @@ export default function RoutingRulesPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
+  
+  const { setIsDirty, setDirtyMessage } = useDirty()
+
+  useEffect(() => {
+    setDirtyMessage('Save the routing rules first!')
+    return () => {
+      setIsDirty(false)
+      setDirtyMessage('')
+    }
+  }, [setIsDirty, setDirtyMessage])
 
   const filteredModels = modelSearch
-    ? availableModels.filter(m => 
-        m.id.toLowerCase().includes(modelSearch.toLowerCase()) || 
-        m.provider.toLowerCase().includes(modelSearch.toLowerCase())
-      )
+    ? availableModels.filter(m => {
+        const idMatch = m.id ? m.id.toLowerCase().includes(modelSearch.toLowerCase()) : false;
+        const providerMatch = m.provider ? m.provider.toLowerCase().includes(modelSearch.toLowerCase()) : false;
+        return idMatch || providerMatch;
+      })
     : availableModels
 
   const sensors = useSensors(
@@ -108,7 +120,11 @@ export default function RoutingRulesPage() {
       const savedRules = await invoke<RoutingRule[]>('get_routing_rules')
       const models = await invoke<ModelInfo[]>('get_available_models')
       
-      setAvailableModels(models)
+      const uniqueModels = models.filter((v, i, a) => 
+        a.findIndex(t => t.id === v.id && t.provider === v.provider) === i
+      )
+      
+      setAvailableModels(uniqueModels)
 
       if (savedRules.length > 0) {
         setRules(savedRules)
@@ -129,6 +145,7 @@ export default function RoutingRulesPage() {
         return arrayMove(items, oldIndex, newIndex)
       })
       setSaved(false)
+      setIsDirty(true)
     }
   }
 
@@ -137,6 +154,7 @@ export default function RoutingRulesPage() {
     try {
       await invoke('save_routing_rules', { rules })
       setSaved(true)
+      setIsDirty(false)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
       console.error('Failed to save rules', err)
@@ -191,7 +209,7 @@ export default function RoutingRulesPage() {
             items={rules.map(r => r.model)}
             strategy={verticalListSortingStrategy}
           >
-            {rules.map((rule, index) => (
+              {rules.map((rule, index) => (
               <SortableRuleItem 
                 key={rule.model} 
                 rule={rule} 
@@ -199,6 +217,7 @@ export default function RoutingRulesPage() {
                 onRemove={() => {
                   setRules(rules.filter(r => r.model !== rule.model))
                   setSaved(false)
+                  setIsDirty(true)
                 }} 
               />
             ))}
@@ -241,10 +260,10 @@ export default function RoutingRulesPage() {
                   Add API keys first to see models.
                 </div>
               )}
-              {filteredModels.map(m => {
+              {filteredModels.map((m, idx) => {
                 const isAdded = rules.some(r => r.model === m.id)
                 return (
-                  <div key={m.id} className="flex items-center justify-between p-3 border-2 border-neo-dark bg-neo-bg">
+                  <div key={`${m.provider}-${m.id}-${idx}`} className="flex items-center justify-between p-3 border-2 border-neo-dark bg-neo-bg">
                     <div>
                       <div className="font-bold">{m.id}</div>
                       <div className="text-xs text-neo-dark/70 uppercase">{m.provider}</div>
@@ -254,6 +273,7 @@ export default function RoutingRulesPage() {
                       onClick={() => {
                         setRules([...rules, { provider: m.provider, model: m.id }])
                         setSaved(false)
+                        setIsDirty(true)
                       }}
                       className="px-3 py-1 bg-neo-green border-2 border-neo-dark text-xs font-black uppercase disabled:opacity-50 disabled:bg-neo-bg cursor-pointer"
                     >

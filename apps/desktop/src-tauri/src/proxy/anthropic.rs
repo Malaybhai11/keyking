@@ -298,7 +298,7 @@ pub async fn handle_anthropic_messages(
                 }
                 // After stripping, we should have either JSON, "[DONE]", or something to skip
                 let trimmed = trimmed.trim();
-                if trimmed.is_empty() || trimmed.starts_with("event:") {
+                if trimmed.is_empty() || trimmed.starts_with("event:") || trimmed.starts_with(":") {
                     continue;
                 }
                 return Some(trimmed.to_string());

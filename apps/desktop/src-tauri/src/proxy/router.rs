@@ -175,19 +175,18 @@ impl ProxyRouter {
         });
     }
 
-    pub fn update_event_tokens(&self, event_id: &str, tokens: u32) {
-        if let Some(ref handle) = self.app_handle {
+    pub fn update_event_tokens_static(vault: Arc<VaultState>, app_handle: Option<tauri::AppHandle>, event_id: &str, tokens: u32) {
+        if let Some(ref handle) = app_handle {
             handle.emit("routing-event-update", serde_json::json!({
                 "id": event_id,
                 "tokens_used": tokens
             })).ok();
         }
         
-        let vault_state = self.vault.clone();
         let id_clone = event_id.to_string();
         tauri::async_runtime::spawn(async move {
-            let vault = vault_state.vault.lock().await;
-            let path = vault.data_dir.join("routing_log.json");
+            let vault_lock = vault.vault.lock().await;
+            let path = vault_lock.data_dir.join("routing_log.json");
             if path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     if let Ok(mut logs) = serde_json::from_str::<Vec<RoutingEvent>>(&content) {
@@ -204,6 +203,10 @@ impl ProxyRouter {
                 }
             }
         });
+    }
+
+    pub fn update_event_tokens(&self, event_id: &str, tokens: u32) {
+        Self::update_event_tokens_static(self.vault.clone(), self.app_handle.clone(), event_id, tokens);
     }
 
     async fn try_key(
@@ -292,6 +295,7 @@ impl ProxyRouter {
                 "model": effective_model,
                 "messages": req.messages,
                 "stream": true,
+                "stream_options": { "include_usage": true },
                 "temperature": req.temperature,
                 "max_tokens": effective_max_tokens,
                 "top_p": req.top_p,
@@ -347,15 +351,33 @@ impl ProxyRouter {
             self.update_quota_from_headers(&key_entry.id, provider, upstream.headers()).await;
 
             let latency = start.elapsed().as_millis() as u64;
-            let stream = upstream.bytes_stream().map(|chunk_result| {
+            let event_id = Uuid::new_v4().to_string();
+            let event_id_clone = event_id.clone();
+            let vault_clone = self.vault.clone();
+            let app_clone = self.app_handle.clone();
+
+            let stream = upstream.bytes_stream().map(move |chunk_result| {
                 chunk_result
-                    .map(|bytes| Event::default().data(String::from_utf8_lossy(&bytes).as_ref()))
+                    .map(|bytes| {
+                        let text = String::from_utf8_lossy(&bytes);
+                        if text.contains("\"usage\"") && text.contains("\"total_tokens\":") {
+                            if let Some(idx) = text.find("\"total_tokens\":") {
+                                let start = idx + 15;
+                                let remaining = &text[start..];
+                                let end_idx = remaining.find(|c: char| !c.is_ascii_digit()).unwrap_or(remaining.len());
+                                if let Ok(tokens) = remaining[..end_idx].trim().parse::<u32>() {
+                                    ProxyRouter::update_event_tokens_static(vault_clone.clone(), app_clone.clone(), &event_id_clone, tokens);
+                                }
+                            }
+                        }
+                        Event::default().data(text.as_ref())
+                    })
                     .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { e.into() })
             });
 
             self.circuit_breaker.record_success(&key_entry.id).await;
             self.emit_event(RoutingEvent {
-                id: Uuid::new_v4().to_string(),
+                id: event_id,
                 timestamp: now_secs(),
                 provider: provider.to_string(),
                 latency_ms: latency,
