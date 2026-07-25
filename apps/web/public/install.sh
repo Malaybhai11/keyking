@@ -25,7 +25,7 @@ fi
 
 # Hard fallback if API is unreachable
 if [ -z "$VERSION" ]; then
-    VERSION="3.2.3"
+    VERSION="3.3.0"
 fi
 
 # ─────────────────────────── Theme Colors ─────────────────────────────
