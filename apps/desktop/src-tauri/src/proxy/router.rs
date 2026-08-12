@@ -209,6 +209,17 @@ impl ProxyRouter {
         Self::update_event_tokens_static(self.vault.clone(), self.app_handle.clone(), event_id, tokens);
     }
 
+    /// Removes keys whose value is JSON null from a request body built with
+    /// serde_json::json!(). json!() serializes Option::None as explicit null,
+    /// bypassing the skip_serializing_if attributes on NormalizedRequest, and
+    /// strict OpenAI-compatible upstreams (e.g. SGLang) reject null numeric
+    /// params like frequency_penalty/presence_penalty with a 400.
+    fn strip_null_fields(body: &mut serde_json::Value) {
+        if let Some(obj) = body.as_object_mut() {
+            obj.retain(|_, v| !v.is_null());
+        }
+    }
+
     async fn try_key(
         &self,
         key_entry: &crate::vault::StoredKeyEntry,
@@ -303,6 +314,9 @@ impl ProxyRouter {
                 "presence_penalty": req.presence_penalty,
             });
 
+            // Drop optional fields the client never set instead of sending null.
+            Self::strip_null_fields(&mut stream_req);
+
             if let Some(obj) = stream_req.as_object_mut() {
                 for (k, v) in &req.extra {
                     if provider == "Groq" && k == "tool_choice" && v == "required" {
@@ -340,6 +354,14 @@ impl ProxyRouter {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
                 self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 429 Rate Limited")) });
                 return Err(());
+            }
+            // 400/404/422 are deterministic request-shape errors: every key and
+            // provider would reject the same body, so don't record a key failure
+            // or rotate — pass the upstream error back to the caller as-is.
+            if status == 400 || status == 404 || status == 422 {
+                let msg = upstream.text().await.unwrap_or_default();
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {} (request error, not retrying)", status)) });
+                return Ok((StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_REQUEST), msg).into_response());
             }
             if !upstream.status().is_success() {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
@@ -548,6 +570,9 @@ impl ProxyRouter {
                     "presence_penalty": req.presence_penalty,
                 });
 
+                // Drop optional fields the client never set instead of sending null.
+                Self::strip_null_fields(&mut stream_req);
+
                 if let Some(obj) = stream_req.as_object_mut() {
                     for (k, v) in &req.extra {
                         if provider == "Groq" && k == "tool_choice" && v == "required" {
@@ -575,6 +600,14 @@ impl ProxyRouter {
                 };
 
                 let status = upstream.status().as_u16();
+                // 400/404/422 are deterministic request-shape errors: rotating keys
+                // or providers would fail identically on the same body, so surface
+                // the upstream error instead of recording a key failure.
+                if status == 400 || status == 404 || status == 422 {
+                    let msg = upstream.text().await.unwrap_or_default();
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {} (request error, not retrying)", status)) });
+                    return Err(format!("Upstream rejected the request (HTTP {}): {}", status, msg));
+                }
                 if status == 401 || status == 429 || !upstream.status().is_success() {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
                     self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
@@ -714,6 +747,9 @@ impl ProxyRouter {
                     "frequency_penalty": req.frequency_penalty,
                     "presence_penalty": req.presence_penalty,
                 });
+
+                // Drop optional fields the client never set instead of sending null.
+                Self::strip_null_fields(&mut stream_req);
 
                 if let Some(obj) = stream_req.as_object_mut() {
                     for (k, v) in &req.extra {
