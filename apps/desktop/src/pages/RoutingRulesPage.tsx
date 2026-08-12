@@ -30,6 +30,12 @@ interface ModelInfo {
   provider: string
 }
 
+// Rules are identified by provider+model, never by model alone: the same model
+// id can legitimately appear from two providers (e.g. a kimi model on both
+// Nvidia and TokenRouter), and keying by model alone collides dnd-kit ids,
+// React keys, the remove filter, and the "Added" state.
+const ruleKey = (r: RoutingRule) => `${r.provider}::${r.model}`
+
 function SortableRuleItem({ rule, index, onRemove }: { rule: RoutingRule, index: number, onRemove: () => void }) {
   const {
     attributes,
@@ -37,7 +43,7 @@ function SortableRuleItem({ rule, index, onRemove }: { rule: RoutingRule, index:
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: rule.model })
+  } = useSortable({ id: ruleKey(rule) })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,10 +87,13 @@ function SortableRuleItem({ rule, index, onRemove }: { rule: RoutingRule, index:
 export default function RoutingRulesPage() {
   const [rules, setRules] = useState<RoutingRule[]>([])
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
+  const [keyedProviders, setKeyedProviders] = useState<string[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
+  const [customModelId, setCustomModelId] = useState('')
+  const [customProvider, setCustomProvider] = useState('')
   
   const { setIsDirty, setDirtyMessage } = useDirty()
 
@@ -96,13 +105,24 @@ export default function RoutingRulesPage() {
     }
   }, [setIsDirty, setDirtyMessage])
 
-  const filteredModels = modelSearch
+  // Trim the query — a stray trailing/leading space ("kimi ") used to match nothing.
+  const query = modelSearch.trim().toLowerCase()
+  const filteredModels = query
     ? availableModels.filter(m => {
-        const idMatch = m.id ? m.id.toLowerCase().includes(modelSearch.toLowerCase()) : false;
-        const providerMatch = m.provider ? m.provider.toLowerCase().includes(modelSearch.toLowerCase()) : false;
+        const idMatch = m.id ? m.id.toLowerCase().includes(query) : false;
+        const providerMatch = m.provider ? m.provider.toLowerCase().includes(query) : false;
         return idMatch || providerMatch;
       })
     : availableModels
+
+  // The custom-entry provider dropdown lists every provider that has a key,
+  // even if its catalog fetch failed — that's exactly when you need the
+  // escape hatch of typing a model id by hand.
+  const effectiveCustomProvider = customProvider || keyedProviders[0] || ''
+  const customIdTrimmed = customModelId.trim()
+  const customAlreadyAdded = rules.some(
+    r => r.provider === effectiveCustomProvider && r.model === customIdTrimmed
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -119,12 +139,14 @@ export default function RoutingRulesPage() {
     try {
       const savedRules = await invoke<RoutingRule[]>('get_routing_rules')
       const models = await invoke<ModelInfo[]>('get_available_models')
+      const keys = await invoke<{ provider: string }[]>('list_keys')
       
-      const uniqueModels = models.filter((v, i, a) => 
+      const uniqueModels = models.filter((v, i, a) =>
         a.findIndex(t => t.id === v.id && t.provider === v.provider) === i
       )
       
       setAvailableModels(uniqueModels)
+      setKeyedProviders(Array.from(new Set(keys.map(k => k.provider))).sort())
 
       if (savedRules.length > 0) {
         setRules(savedRules)
@@ -139,14 +161,22 @@ export default function RoutingRulesPage() {
     
     if (over && active.id !== over.id) {
       setRules((items) => {
-        const oldIndex = items.findIndex(i => i.model === active.id)
-        const newIndex = items.findIndex(i => i.model === over.id)
+        const oldIndex = items.findIndex(i => ruleKey(i) === active.id)
+        const newIndex = items.findIndex(i => ruleKey(i) === over.id)
         
         return arrayMove(items, oldIndex, newIndex)
       })
       setSaved(false)
       setIsDirty(true)
     }
+  }
+
+  function addCustomModel() {
+    if (!customIdTrimmed || !effectiveCustomProvider || customAlreadyAdded) return
+    setRules([...rules, { provider: effectiveCustomProvider, model: customIdTrimmed }])
+    setCustomModelId('')
+    setSaved(false)
+    setIsDirty(true)
   }
 
   async function saveRules() {
@@ -206,16 +236,16 @@ export default function RoutingRulesPage() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext 
-            items={rules.map(r => r.model)}
+            items={rules.map(ruleKey)}
             strategy={verticalListSortingStrategy}
           >
               {rules.map((rule, index) => (
               <SortableRuleItem 
-                key={rule.model} 
+                key={ruleKey(rule)} 
                 rule={rule} 
                 index={index} 
                 onRemove={() => {
-                  setRules(rules.filter(r => r.model !== rule.model))
+                  setRules(rules.filter(r => ruleKey(r) !== ruleKey(rule)))
                   setSaved(false)
                   setIsDirty(true)
                 }} 
@@ -245,10 +275,44 @@ export default function RoutingRulesPage() {
                 type="text"
                 placeholder="Search models or providers..."
                 value={modelSearch}
+                autoFocus
                 onChange={(e) => setModelSearch(e.target.value)}
                 className="w-full bg-white border-2 border-neo-dark px-3 py-2 text-neo-dark font-bold placeholder:text-neo-dark/50 focus:outline-none focus:bg-neo-yellow transition-all"
               />
             </div>
+            {keyedProviders.length > 0 && (
+              <div className="p-4 border-b-3 border-neo-dark bg-white">
+                <div className="text-xs font-black uppercase text-neo-dark/60 mb-2">
+                  Missing a model? Type its exact provider-side id:
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={effectiveCustomProvider}
+                    onChange={(e) => setCustomProvider(e.target.value)}
+                    className="bg-white border-2 border-neo-dark px-2 py-2 text-neo-dark font-bold focus:outline-none focus:bg-neo-yellow"
+                  >
+                    {keyedProviders.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="e.g. moonshotai/kimi-k2.6"
+                    value={customModelId}
+                    onChange={(e) => setCustomModelId(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addCustomModel() }}
+                    className="flex-1 bg-white border-2 border-neo-dark px-3 py-2 text-neo-dark font-bold placeholder:text-neo-dark/50 focus:outline-none focus:bg-neo-yellow"
+                  />
+                  <button
+                    onClick={addCustomModel}
+                    disabled={!customIdTrimmed || customAlreadyAdded}
+                    className="px-3 py-2 bg-neo-green border-2 border-neo-dark text-xs font-black uppercase disabled:opacity-50 cursor-pointer"
+                  >
+                    {customAlreadyAdded ? 'Added' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="p-4 overflow-y-auto flex-1 space-y-2">
               {filteredModels.length === 0 && availableModels.length > 0 && (
                 <div className="text-center py-6 text-neo-dark/50 font-black uppercase">
@@ -260,10 +324,10 @@ export default function RoutingRulesPage() {
                   Add API keys first to see models.
                 </div>
               )}
-              {filteredModels.map((m, idx) => {
-                const isAdded = rules.some(r => r.model === m.id)
+              {filteredModels.map((m) => {
+                const isAdded = rules.some(r => r.provider === m.provider && r.model === m.id)
                 return (
-                  <div key={`${m.provider}-${m.id}-${idx}`} className="flex items-center justify-between p-3 border-2 border-neo-dark bg-neo-bg">
+                  <div key={`${m.provider}::${m.id}`} className="flex items-center justify-between p-3 border-2 border-neo-dark bg-neo-bg">
                     <div>
                       <div className="font-bold">{m.id}</div>
                       <div className="text-xs text-neo-dark/70 uppercase">{m.provider}</div>

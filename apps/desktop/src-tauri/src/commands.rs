@@ -121,6 +121,59 @@ struct OpenAiModelsResponse {
     data: Vec<OpenAiModel>,
 }
 
+/// Static fallback catalog, used only when a provider's live /models endpoint
+/// is unreachable, errors, or returns an unparsable body — the model popup
+/// should never be empty just because the network is flaky. Live results always
+/// win when available, so provider catalog changes are picked up automatically.
+fn static_catalog(provider: &str) -> Vec<&'static str> {
+    match provider {
+        "Anthropic" => vec![
+            "claude-opus-4-8",
+            "claude-opus-4.5",
+            "claude-sonnet-4.5",
+            "claude-haiku-4.5",
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
+        ],
+        "Cerebras" => vec![
+            "llama3.1-8b",
+            "llama-3.3-70b",
+        ],
+        "Sambanova" => vec![
+            "Meta-Llama-3.1-8B-Instruct",
+            "Meta-Llama-3.1-70B-Instruct",
+            "Meta-Llama-3.3-70B-Instruct",
+            "Qwen2.5-72B-Instruct",
+            "DeepSeek-R1-Distill-Llama-70B",
+        ],
+        "Cloudflare" => vec![
+            "@cf/meta/llama-3.1-8b-instruct",
+            "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+            "@cf/qwen/qwen1.5-14b-chat-awq",
+        ],
+        "Github" => vec![
+            "gpt-4o",
+            "gpt-4o-mini",
+            "Phi-3.5-mini-instruct",
+            "Llama-3.3-70B-Instruct",
+        ],
+        "Lumos" => vec![
+            "claude-opus-4-8",
+            "claude-opus-4.5",
+            "claude-sonnet-4.5",
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4.5",
+            "claude-haiku-4-5-20251001",
+            "gpt-5.5",
+        ],
+        "TokenRouter" => vec![
+            "moonshotai/kimi-k3-free",
+            "kimi-k3-free",
+        ],
+        _ => vec![],
+    }
+}
+
 #[tauri::command]
 pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Result<Vec<ModelInfo>, String> {
     let vault = state.vault.lock().await;
@@ -144,60 +197,11 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
     let mut futures = Vec::new();
 
     for (provider, key) in provider_keys {
-        if provider == "Anthropic" {
-            all_models.push(ModelInfo { id: "claude-3-5-sonnet-latest".into(), provider: "Anthropic".into() });
-            all_models.push(ModelInfo { id: "claude-3-5-haiku-latest".into(), provider: "Anthropic".into() });
-            all_models.push(ModelInfo { id: "claude-3-opus-latest".into(), provider: "Anthropic".into() });
-            continue;
-        }
-
-        if provider == "Cerebras" {
-            all_models.push(ModelInfo { id: "llama3.1-8b".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "llama-3.3-70b".into(), provider: provider.clone() });
-            continue;
-        }
-
-        if provider == "Sambanova" {
-            all_models.push(ModelInfo { id: "Meta-Llama-3.1-8B-Instruct".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "Meta-Llama-3.1-70B-Instruct".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "Meta-Llama-3.3-70B-Instruct".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "Qwen2.5-72B-Instruct".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "DeepSeek-R1-Distill-Llama-70B".into(), provider: provider.clone() });
-            continue;
-        }
-
-        if provider == "Cloudflare" {
-            all_models.push(ModelInfo { id: "@cf/meta/llama-3.1-8b-instruct".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "@cf/qwen/qwen1.5-14b-chat-awq".into(), provider: provider.clone() });
-            continue;
-        }
-
-        if provider == "Github" {
-            all_models.push(ModelInfo { id: "gpt-4o".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "gpt-4o-mini".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "Phi-3.5-mini-instruct".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "Llama-3.3-70B-Instruct".into(), provider: provider.clone() });
-            continue;
-        }
-
-        if provider == "Lumos" {
-            all_models.push(ModelInfo { id: "claude-opus-4-8".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "claude-opus-4.5".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "claude-sonnet-4.5".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "claude-sonnet-4-5-20250929".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "claude-haiku-4.5".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "claude-haiku-4-5-20251001".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "gpt-5.5".into(), provider: provider.clone() });
-            continue;
-        }
-
-        if provider == "TokenRouter" {
-            all_models.push(ModelInfo { id: "moonshotai/kimi-k3-free".into(), provider: provider.clone() });
-            all_models.push(ModelInfo { id: "kimi-k3-free".into(), provider: provider.clone() });
-            continue;
-        }
-
+        // Live catalog endpoints. Previously Anthropic, Cerebras, Sambanova,
+        // Cloudflare, Github, Lumos and TokenRouter were hardcoded static lists
+        // that went stale as providers rotated their catalogs; now every
+        // provider with a models endpoint is fetched live and the static list
+        // is only a fallback.
         let url = match provider.as_str() {
             "OpenAI" => Some("https://api.openai.com/v1/models"),
             "Groq" => Some("https://api.groq.com/openai/v1/models"),
@@ -210,6 +214,9 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             "OpencodeZen" => Some("https://opencode.ai/zen/v1/models"),
             "Lumos" => Some("https://api.lumosel.vip/v1/models"),
             "TokenRouter" => Some("https://api.tokenrouter.com/v1/models"),
+            "Anthropic" => Some("https://api.anthropic.com/v1/models"),
+            "Cerebras" => Some("https://api.cerebras.ai/v1/models"),
+            "Sambanova" => Some("https://api.sambanova.ai/v1/models"),
             _ => None,
         };
 
@@ -218,27 +225,57 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             let p_clone = provider.clone();
             let k_clone = key.clone();
             let fut = async move {
-                let mut req = client_clone.get(u).header("Authorization", format!("Bearer {}", k_clone));
-                if p_clone == "OpenRouter" {
-                    req = req.header("HTTP-Referer", "https://keyking.ledgion.in")
-                             .header("X-Title", "KeyKing");
-                }
+                // Anthropic-protocol providers authenticate with x-api-key.
+                let req = match p_clone.as_str() {
+                    "Anthropic" | "Lumos" => client_clone.get(u)
+                        .header("x-api-key", k_clone.as_str())
+                        .header("anthropic-version", "2023-06-01")
+                        .header("Authorization", format!("Bearer {}", k_clone)),
+                    _ => client_clone.get(u)
+                        .header("Authorization", format!("Bearer {}", k_clone)),
+                };
+                let req = if p_clone == "OpenRouter" {
+                    req.header("HTTP-Referer", "https://keyking.ledgion.in")
+                       .header("X-Title", "KeyKing")
+                } else {
+                    req
+                };
                 let mut results = Vec::new();
-                if let Ok(resp) = req.send().await {
-                    if resp.status().is_success() {
-                        if let Ok(data) = resp.json::<OpenAiModelsResponse>().await {
-                            for m in data.data {
-                                results.push(ModelInfo {
-                                    id: m.id,
-                                    provider: p_clone.clone(),
-                                });
+                match req.send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        match resp.json::<OpenAiModelsResponse>().await {
+                            Ok(data) => {
+                                for m in data.data {
+                                    results.push(ModelInfo {
+                                        id: m.id,
+                                        provider: p_clone.clone(),
+                                    });
+                                }
                             }
+                            Err(e) => eprintln!("[keyking] {} /models parse failed: {}", p_clone, e),
                         }
+                    }
+                    Ok(resp) => eprintln!("[keyking] {} /models returned HTTP {}", p_clone, resp.status()),
+                    Err(e) => eprintln!("[keyking] {} /models request failed: {}", p_clone, e),
+                }
+                if results.is_empty() {
+                    // Live catalog failed — fall back to the static list so the
+                    // popup is never empty just because the network is flaky.
+                    for id in static_catalog(&p_clone) {
+                        results.push(ModelInfo {
+                            id: id.to_string(),
+                            provider: p_clone.clone(),
+                        });
                     }
                 }
                 results
             };
             futures.push(fut);
+        } else {
+            // No live catalog endpoint (Cloudflare, Github) — static list only.
+            for id in static_catalog(&provider) {
+                all_models.push(ModelInfo { id: id.to_string(), provider: provider.clone() });
+            }
         }
     }
     
@@ -381,14 +418,6 @@ pub async fn export_vault(
     // Generate 12-byte random nonce
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
-
-    // Encrypt with AES-256-GCM
-    let key = Key::<Aes256Gcm>::from_slice(&derived_key);
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher
-        .encrypt(nonce, json_payload.as_bytes())
-        .map_err(|_| "Encryption failed".to_string())?;
 
     // Wire format: salt[32] + nonce[12] + ciphertext_with_tag
     let mut wire = Vec::with_capacity(32 + 12 + ciphertext.len());
