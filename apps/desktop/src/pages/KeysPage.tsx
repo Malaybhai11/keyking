@@ -32,7 +32,7 @@ export default function KeysPage() {
   const [showGuide, setShowGuide] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
-  const providers = ['OpenAI', 'Groq', 'Gemini', 'Mistral', 'Anthropic', 'xAI', 'DeepSeek', 'OpenRouter', 'Cohere', 'Cerebras', 'Sambanova', 'Cloudflare', 'Github', 'Nvidia', 'OpencodeZen']
+  const providers = ['OpenAI', 'Groq', 'Gemini', 'Mistral', 'Anthropic', 'xAI', 'DeepSeek', 'OpenRouter', 'Cohere', 'Cerebras', 'Sambanova', 'Cloudflare', 'Github', 'Nvidia', 'OpencodeZen', 'Lumos', 'TokenRouter']
 
   const loadKeys = async () => {
     try {
@@ -343,6 +343,21 @@ export default function KeysPage() {
                     <div className="bg-neo-cyan/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Command R+</div>
                     <div className="mt-auto">
                       <a href="https://dashboard.cohere.com/" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lumos */}
+                <div className="bg-neo-pink border-4 border-neo-dark shadow-[6px_6px_0px_0px_rgba(33,37,41,1)] overflow-hidden flex flex-col">
+                  <div className="bg-neo-dark text-white px-4 py-2 flex justify-between items-center font-display font-black text-sm tracking-wider uppercase">
+                    Lumos
+                    <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div><div className="w-2.5 h-2.5 rounded-full border-2 border-white/50"></div></div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col bg-neo-pink">
+                    <div className="bg-neo-cyan px-2 py-1 inline-block border-2 border-neo-dark shadow-neo-sm font-black font-display text-2xl uppercase w-fit mb-2">High-Speed API</div>
+                    <div className="bg-white/50 px-2 inline-block border border-neo-dark font-bold text-sm mb-6 w-fit">Lumos Models</div>
+                    <div className="mt-auto">
+                      <a href="https://lumosel.vip" target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-neo-dark text-white py-3 font-display font-black uppercase tracking-wider hover:bg-neo-pink hover:text-neo-dark border-2 border-neo-dark transition-colors shadow-neo-sm">Get API Key ↗</a>
                     </div>
                   </div>
                 </div>

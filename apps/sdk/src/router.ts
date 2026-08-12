@@ -82,11 +82,27 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     baseUrl: "https://opencode.ai/zen/v1/chat/completions",
     openaiCompatible: true,
   },
+  Lumos: {
+    baseUrl: "https://api.lumosel.vip/v1/messages",
+    openaiCompatible: false,
+  },
+  TokenRouter: {
+    baseUrl: "https://api.tokenrouter.com/v1/chat/completions",
+    openaiCompatible: true,
+  },
 };
 
 // ─── Model → Provider Mapping ────────────────────────────────────────────────
 
 const MODEL_PREFIX_MAP: [string, Provider][] = [
+  ["tokenrouter", "TokenRouter"],
+  ["kimi", "TokenRouter"],
+  ["moonshot", "TokenRouter"],
+  ["lumos", "Lumos"],
+  ["claude-opus-4", "Lumos"],
+  ["claude-sonnet-4.5", "Lumos"],
+  ["claude-haiku-4", "Lumos"],
+  ["gpt-5.5", "Lumos"],
   ["gpt-", "OpenAI"],
   ["o1", "OpenAI"],
   ["o3", "OpenAI"],
@@ -154,7 +170,7 @@ function mapToAnthropicModel(model: string): string | null {
 function getFallbackProviders(primary: Provider): Provider[] {
   const allProviders: Provider[] = [
     "OpenAI", "Groq", "Anthropic", "Gemini", "Mistral",
-    "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen"
+    "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos"
   ];
   
   const fallbacks: Provider[] = [];
@@ -259,13 +275,14 @@ async function sendToProvider(
   const timeoutId = setTimeout(() => controller.abort(), opts.timeout);
 
   try {
-    if (provider === "Anthropic") {
+    if (provider === "Anthropic" || provider === "Lumos") {
       const anthropicReq = toAnthropicRequest({ ...request, model });
       response = await fetch(config.baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-API-Key": apiKey,
+          "Authorization": `Bearer ${apiKey}`,
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify(anthropicReq),
@@ -309,7 +326,7 @@ async function sendToProvider(
   }
 
   if (isStream) {
-    if (provider === "Anthropic") {
+    if (provider === "Anthropic" || provider === "Lumos") {
       const anthropicResp = (await response.json()) as AnthropicResponse;
       const fullResp = fromAnthropicResponse(anthropicResp);
       
@@ -364,7 +381,7 @@ async function sendToProvider(
     })();
   }
 
-  if (provider === "Anthropic") {
+  if (provider === "Anthropic" || provider === "Lumos") {
     const anthropicResp = (await response.json()) as AnthropicResponse;
     const result = fromAnthropicResponse(anthropicResp);
     result._keyking_provider = provider;

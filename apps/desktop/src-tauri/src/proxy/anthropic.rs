@@ -228,11 +228,94 @@ pub async fn handle_anthropic_messages(
     }
 
     // For streaming, use the raw stream to bypass axum SSE double-wrapping
-    let (response, event_id) = match router.get_raw_stream(&normalized).await {
+    let (response, event_id, provider) = match router.get_raw_stream(&normalized).await {
         Ok(r) => r,
         Err(e) => return (StatusCode::BAD_GATEWAY, format!("Routing failed: {}", e)).into_response(),
     };
     
+    // If the provider natively speaks Anthropic protocol (Anthropic, Lumos), pass through raw bytes directly!
+    if provider == "Anthropic" || provider == "Lumos" {
+        let mut byte_stream = response.bytes_stream();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<axum::body::Bytes, std::convert::Infallible>>();
+        let router_clone = router.clone();
+
+        tokio::spawn(async move {
+            let mut total_tokens = 0u32;
+            let mut buffer = String::new();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        let text = String::from_utf8_lossy(&chunk);
+                        buffer.push_str(&text);
+
+                        while let Some(pos) = buffer.find("\n\n") {
+                            let event_str = buffer[..pos].to_string();
+                            buffer = buffer[pos + 2..].to_string();
+
+                            for line in event_str.lines() {
+                                let l = line.trim();
+                                let json_str = if l.starts_with("data: ") {
+                                    &l[6..]
+                                } else if l.starts_with("data:") {
+                                    &l[5..]
+                                } else {
+                                    ""
+                                };
+                                if !json_str.is_empty() {
+                                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                                        if let Some(usage) = val.get("usage") {
+                                            let input = usage.get("input_tokens").and_then(|t| t.as_u64()).unwrap_or(0);
+                                            let output = usage.get("output_tokens").and_then(|t| t.as_u64()).unwrap_or(0);
+                                            if input + output > 0 {
+                                                total_tokens += (input + output) as u32;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if tx.send(Ok(chunk)).is_err() {
+                            eprintln!("[keyking:anthropic] Downstream disconnected during native passthrough");
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[keyking:anthropic] Stream read error: {}", e);
+                        break;
+                    }
+                }
+            }
+
+            if total_tokens > 0 {
+                router_clone.update_event_tokens(&event_id, total_tokens);
+            }
+        });
+
+        let body_stream = futures::stream::unfold(rx, |mut rx| async move {
+            match rx.recv().await {
+                Some(chunk_res) => Some((chunk_res, rx)),
+                None => None,
+            }
+        });
+
+        return (
+            [
+                ("Content-Type", "text/event-stream"),
+                ("Cache-Control", "no-cache"),
+                ("Connection", "keep-alive"),
+            ],
+            axum::body::Body::from_stream(body_stream),
+        ).into_response();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // OpenAI-format SSE → Anthropic-format SSE translation
+    // Designed for long-running reasoning models (Kimi k3, DeepSeek R1, QwQ)
+    // that can think for 5+ minutes with 100k+ reasoning tokens.
+    // ═══════════════════════════════════════════════════════════════════════════
+
     let mut byte_stream = response.bytes_stream();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     
@@ -240,8 +323,13 @@ pub async fn handle_anthropic_messages(
     tokio::spawn(async move {
         let msg_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..24].to_string());
         
-        // message_start
-        let _ = tx.send(Event::default().event("message_start").data(json!({
+        // ── Helper: send an SSE event, returning false if downstream disconnected ──
+        let send = |tx: &tokio::sync::mpsc::UnboundedSender<Event>, event: Event| -> bool {
+            tx.send(event).is_ok()
+        };
+        
+        // ── 1. message_start ──
+        if !send(&tx, Event::default().event("message_start").data(json!({
             "type": "message_start",
             "message": {
                 "id": msg_id,
@@ -258,13 +346,20 @@ pub async fn handle_anthropic_messages(
                     "cache_read_input_tokens": 0
                 }
             }
-        }).to_string()));
+        }).to_string())) {
+            eprintln!("[keyking:anthropic] Downstream gone before message_start");
+            return;
+        }
         
-        // Send ping to keep alive
-        let _ = tx.send(Event::default().event("ping").data(json!({"type": "ping"}).to_string()));
-        
-        // content_block_start for text block (index 0)
-        let _ = tx.send(Event::default().event("content_block_start").data(json!({
+        // ── 2. Initial ping ──
+        let _ = send(&tx, Event::default().event("ping").data(json!({"type": "ping"}).to_string()));
+
+        // ── 3. Pre-emit text block at index 0 ──
+        // Immediately tell Claude Code we have content coming. This prevents
+        // any "empty response" detection from kicking in during long waits.
+        // For reasoning models (Kimi k3, DeepSeek R1), we'll lazily open a
+        // thinking block when reasoning_content actually starts flowing.
+        let _ = send(&tx, Event::default().event("content_block_start").data(json!({
             "type": "content_block_start",
             "index": 0,
             "content_block": {
@@ -273,20 +368,31 @@ pub async fn handle_anthropic_messages(
             }
         }).to_string()));
 
+        // ── State machine ──
         let mut buffer = String::new();
-        let mut active_indices: Vec<u64> = vec![0]; // ordered list of active block indices
+        let mut current_block_index: Option<u64> = Some(0); // Pre-opened text block
+        let mut current_block_type: &str = "text";           // "thinking" | "text" | "tool_use"
+        let mut next_block_index: u64 = 1;
+        let mut has_emitted_thinking: bool = false;           // Did we emit any thinking content?
+        let mut has_emitted_text: bool = false;               // Did we emit any text content?
+        let mut has_tool_calls: bool = false;
+        let mut received_done: bool = false;
         let mut final_stop_reason = "end_turn".to_string();
         let mut output_tokens: u64 = 0;
         let mut input_tokens: u64 = 0;
         let mut tool_arg_buffers: std::collections::HashMap<u64, String> = std::collections::HashMap::new();
+        let mut total_chunks: u64 = 0;
+
+        // ── 3-second keepalive ticker ──
+        // Claude Code's stall detector triggers at ~30-60s of silence.
+        // 3s pings give us a comfortable margin even with network jitter.
+        let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(3));
+        ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         
-        // Helper: extract data payload from potentially multi-line and double-wrapped SSE event
-        // The internal /v1/chat/completions endpoint wraps upstream SSE chunks in another Event,
-        // so we may get "data: data: {...}" or even "data: event: ...\ndata: data: {...}"
+        // ── Helper: extract data payload from SSE event ──
         fn extract_data_line(event_str: &str) -> Option<String> {
             for line in event_str.lines() {
                 let mut trimmed = line.trim();
-                // Strip all leading "data:" or "data: " prefixes (handles double-wrapping)
                 loop {
                     if trimmed.starts_with("data: ") {
                         trimmed = &trimmed[6..];
@@ -296,7 +402,6 @@ pub async fn handle_anthropic_messages(
                         break;
                     }
                 }
-                // After stripping, we should have either JSON, "[DONE]", or something to skip
                 let trimmed = trimmed.trim();
                 if trimmed.is_empty() || trimmed.starts_with("event:") || trimmed.starts_with(":") {
                     continue;
@@ -305,15 +410,67 @@ pub async fn handle_anthropic_messages(
             }
             None
         }
+
+        // ── Helper: close the current block and open a new one ──
+        // Returns the new block index.
+        macro_rules! open_block {
+            ($tx:expr, $current_block_index:expr, $next_block_index:expr, $block_type:expr, $block_data:expr) => {{
+                // Close whatever block is currently open
+                if let Some(idx) = $current_block_index {
+                    if !send($tx, Event::default().event("content_block_stop").data(json!({
+                        "type": "content_block_stop",
+                        "index": idx
+                    }).to_string())) {
+                        eprintln!("[keyking:anthropic] Downstream disconnected during block close");
+                    }
+                }
+                let idx = $next_block_index;
+                $next_block_index += 1;
+                $current_block_index = Some(idx);
+                let _ = send($tx, Event::default().event("content_block_start").data(json!({
+                    "type": "content_block_start",
+                    "index": idx,
+                    "content_block": $block_data
+                }).to_string()));
+                idx
+            }};
+        }
         
-        while let Some(chunk_result) = byte_stream.next().await {
-            let chunk = match chunk_result {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("[keyking:anthropic] Stream read error: {}", e);
-                    break;
+        eprintln!("[keyking:anthropic] Starting stream translation for model={}", original_model);
+        
+        // ═══════════════ Main stream loop ═══════════════
+        loop {
+            let chunk = tokio::select! {
+                biased; // Prefer data over pings when both are ready
+                
+                chunk_opt = byte_stream.next() => {
+                    match chunk_opt {
+                        Some(Ok(c)) => c,
+                        Some(Err(e)) => {
+                            eprintln!("[keyking:anthropic] Stream read error after {} chunks: {}", total_chunks, e);
+                            // DON'T silently break — log the error clearly
+                            break;
+                        }
+                        None => {
+                            if !received_done {
+                                eprintln!("[keyking:anthropic] Stream ended without [DONE] after {} chunks (abnormal)", total_chunks);
+                            } else {
+                                eprintln!("[keyking:anthropic] Stream finished normally after {} chunks", total_chunks);
+                            }
+                            break;
+                        }
+                    }
+                }
+                _ = ping_interval.tick() => {
+                    if !send(&tx, Event::default().event("ping").data(json!({"type": "ping"}).to_string())) {
+                        eprintln!("[keyking:anthropic] Downstream disconnected during ping");
+                        return; // Downstream is gone, stop everything
+                    }
+                    continue;
                 }
             };
+            
+            total_chunks += 1;
             buffer.push_str(&String::from_utf8_lossy(&chunk));
             
             // Process all complete SSE events (separated by \n\n)
@@ -321,20 +478,20 @@ pub async fn handle_anthropic_messages(
                 let event_str = buffer[..pos].to_string();
                 buffer = buffer[pos+2..].to_string();
                 
-                // Extract the data line from potentially multi-line SSE
                 let data = match extract_data_line(&event_str) {
                     Some(d) => d,
                     None => continue,
                 };
                 
                 if data == "[DONE]" {
+                    received_done = true;
                     continue;
                 }
                 
                 let json: serde_json::Value = match serde_json::from_str(&data) {
                     Ok(j) => j,
                     Err(e) => {
-                        eprintln!("[keyking:anthropic] JSON parse error: {} for data: {}", e, &data[..data.len().min(200)]);
+                        eprintln!("[keyking:anthropic] JSON parse error: {} — data: {}", e, &data[..data.len().min(200)]);
                         continue;
                     }
                 };
@@ -374,63 +531,100 @@ pub async fn handle_anthropic_messages(
                     None => continue,
                 };
                 
-                // Handle text content
-                if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
-                    if !content.is_empty() {
-                        output_tokens += 1; // rough estimate
-                        let _ = tx.send(Event::default().event("content_block_delta").data(json!({
-                            "type": "content_block_delta",
-                            "index": 0,
-                            "delta": {
-                                "type": "text_delta",
-                                "text": content
-                            }
-                        }).to_string()));
+                // ── Reasoning/thinking content ──
+                // Kimi k3: "reasoning_content", DeepSeek R1: "reasoning_content", QwQ: "thinking"
+                let reasoning_delta = delta.get("reasoning_content")
+                    .and_then(|c| c.as_str())
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| delta.get("thinking")
+                        .and_then(|c| c.as_str())
+                        .filter(|s| !s.is_empty()));
+
+                if let Some(thinking_text) = reasoning_delta {
+                    has_emitted_thinking = true;
+                    output_tokens += 1;
+                    
+                    // If we're not in a thinking block, open one
+                    if current_block_type != "thinking" {
+                        open_block!(&tx, current_block_index, next_block_index, "thinking", json!({
+                            "type": "thinking",
+                            "thinking": ""
+                        }));
+                        current_block_type = "thinking";
+                    }
+
+                    let active_idx = current_block_index.unwrap();
+                    if !send(&tx, Event::default().event("content_block_delta").data(json!({
+                        "type": "content_block_delta",
+                        "index": active_idx,
+                        "delta": {
+                            "type": "thinking_delta",
+                            "thinking": thinking_text
+                        }
+                    }).to_string())) {
+                        eprintln!("[keyking:anthropic] Downstream disconnected during thinking_delta");
+                        return;
+                    }
+                    // Don't fall through to text handling — reasoning is separate
+                    // BUT if content is also present in same delta, we handle it below
+                }
+
+                // ── Text content ──
+                let text_delta = delta.get("content")
+                    .and_then(|c| c.as_str())
+                    .filter(|s| !s.is_empty());
+
+                if let Some(content) = text_delta {
+                    has_emitted_text = true;
+                    output_tokens += 1;
+                    
+                    // If we're not in a text block, open one (closing thinking/tool block if needed)
+                    if current_block_type != "text" {
+                        open_block!(&tx, current_block_index, next_block_index, "text", json!({
+                            "type": "text",
+                            "text": ""
+                        }));
+                        current_block_type = "text";
+                    }
+
+                    let active_idx = current_block_index.unwrap();
+                    if !send(&tx, Event::default().event("content_block_delta").data(json!({
+                        "type": "content_block_delta",
+                        "index": active_idx,
+                        "delta": {
+                            "type": "text_delta",
+                            "text": content
+                        }
+                    }).to_string())) {
+                        eprintln!("[keyking:anthropic] Downstream disconnected during text_delta");
+                        return;
                     }
                 }
                 
-                // Handle tool calls
+                // ── Tool calls ──
                 if let Some(tool_calls) = delta.get("tool_calls").and_then(|t| t.as_array()) {
                     for tc in tool_calls {
-                        let tc_index = tc.get("index").and_then(|i| i.as_u64()).unwrap_or(0);
-                        let block_index = tc_index + 1; // text is index 0, tools start at 1
-                        
-                        // If this tool call has an "id", it's the START of a new tool call
                         if let Some(raw_id) = tc.get("id").and_then(|i| i.as_str()) {
-                            // Normalize to Anthropic-style toolu_ prefix
+                            has_tool_calls = true;
                             let tool_id = if raw_id.starts_with("toolu_") {
                                 raw_id.to_string()
                             } else {
                                 format!("toolu_{}", raw_id)
                             };
                             
-                            // Close the previous block before opening a new one
-                            if let Some(&last_idx) = active_indices.last() {
-                                let _ = tx.send(Event::default().event("content_block_stop").data(json!({
-                                    "type": "content_block_stop",
-                                    "index": last_idx
-                                }).to_string()));
-                            }
-                            
-                            // Track this new block
-                            active_indices.push(block_index);
-                            tool_arg_buffers.insert(block_index, String::new());
-                            
                             let name = tc.get("function")
                                 .and_then(|f| f.get("name"))
                                 .and_then(|n| n.as_str())
                                 .unwrap_or("");
                             
-                            let _ = tx.send(Event::default().event("content_block_start").data(json!({
-                                "type": "content_block_start",
-                                "index": block_index,
-                                "content_block": {
-                                    "type": "tool_use",
-                                    "id": tool_id,
-                                    "name": name,
-                                    "input": {}
-                                }
-                            }).to_string()));
+                            open_block!(&tx, current_block_index, next_block_index, "tool_use", json!({
+                                "type": "tool_use",
+                                "id": tool_id,
+                                "name": name,
+                                "input": {}
+                            }));
+                            current_block_type = "tool_use";
+                            tool_arg_buffers.insert(current_block_index.unwrap(), String::new());
                         }
                         
                         // Stream tool call arguments as input_json_delta
@@ -439,17 +633,19 @@ pub async fn handle_anthropic_messages(
                             .and_then(|a| a.as_str())
                         {
                             if !args.is_empty() {
-                                if let Some(buf) = tool_arg_buffers.get_mut(&block_index) {
-                                    buf.push_str(args);
-                                }
-                                let _ = tx.send(Event::default().event("content_block_delta").data(json!({
-                                    "type": "content_block_delta",
-                                    "index": block_index,
-                                    "delta": {
-                                        "type": "input_json_delta",
-                                        "partial_json": args
+                                if let Some(active_idx) = current_block_index {
+                                    if !send(&tx, Event::default().event("content_block_delta").data(json!({
+                                        "type": "content_block_delta",
+                                        "index": active_idx,
+                                        "delta": {
+                                            "type": "input_json_delta",
+                                            "partial_json": args
+                                        }
+                                    }).to_string())) {
+                                        eprintln!("[keyking:anthropic] Downstream disconnected during tool args");
+                                        return;
                                     }
-                                }).to_string()));
+                                }
                             }
                         }
                     }
@@ -457,19 +653,63 @@ pub async fn handle_anthropic_messages(
             }
         }
         
+        // ═══════════════ Stream ended — finalize ═══════════════
+
+        // If we never emitted any text and there were no tool calls,
+        // open a text block with a fallback message
+        if !has_emitted_text && !has_tool_calls {
+            // Close current block first
+            if let Some(idx) = current_block_index {
+                let _ = send(&tx, Event::default().event("content_block_stop").data(json!({
+                    "type": "content_block_stop",
+                    "index": idx
+                }).to_string()));
+            }
+            let idx = next_block_index;
+            next_block_index += 1;
+            current_block_index = Some(idx);
+            current_block_type = "text";
+            let _ = send(&tx, Event::default().event("content_block_start").data(json!({
+                "type": "content_block_start",
+                "index": idx,
+                "content_block": {
+                    "type": "text",
+                    "text": ""
+                }
+            }).to_string()));
+            
+            if !received_done {
+                // Stream died abnormally — tell the user
+                let _ = send(&tx, Event::default().event("content_block_delta").data(json!({
+                    "type": "content_block_delta",
+                    "index": idx,
+                    "delta": {
+                        "type": "text_delta",
+                        "text": "[KeyKing: upstream stream ended unexpectedly. The model may have hit a generation limit or the connection was interrupted. Please retry.]"
+                    }
+                }).to_string()));
+            }
+        }
+        
         // Close the last active block
-        if let Some(&last_idx) = active_indices.last() {
-            let _ = tx.send(Event::default().event("content_block_stop").data(json!({
+        if let Some(idx) = current_block_index {
+            let _ = send(&tx, Event::default().event("content_block_stop").data(json!({
                 "type": "content_block_stop",
-                "index": last_idx
+                "index": idx
             }).to_string()));
         }
         
+        let effective_stop_reason = if has_tool_calls {
+            "tool_use".to_string()
+        } else {
+            final_stop_reason
+        };
+
         // message_delta with final stop reason
-        let _ = tx.send(Event::default().event("message_delta").data(json!({
+        let _ = send(&tx, Event::default().event("message_delta").data(json!({
             "type": "message_delta",
             "delta": {
-                "stop_reason": final_stop_reason,
+                "stop_reason": effective_stop_reason,
                 "stop_sequence": null
             },
             "usage": {
@@ -478,19 +718,28 @@ pub async fn handle_anthropic_messages(
         }).to_string()));
         
         // message_stop
-        let _ = tx.send(Event::default().event("message_stop").data(json!({
+        let _ = send(&tx, Event::default().event("message_stop").data(json!({
             "type": "message_stop"
         }).to_string()));
+        
+        eprintln!("[keyking:anthropic] Finalized: thinking={} text={} tools={} chunks={} tokens={}",
+            has_emitted_thinking, has_emitted_text, has_tool_calls, total_chunks, output_tokens);
         
         // Update the proxy router log with final token count
         router_clone.update_event_tokens(&event_id, (input_tokens + output_tokens) as u32);
     });
     
+    // Use keep_alive to send SSE comment lines every 15s at the transport level
     Sse::new(futures::stream::unfold(rx, |mut rx| async move {
         match rx.recv().await {
             Some(event) => Some((Ok::<_, std::convert::Infallible>(event), rx)),
             None => None,
         }
-    })).into_response()
+    }))
+    .keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(std::time::Duration::from_secs(3))
+            .text("keep-alive")
+    )
+    .into_response()
 }
-

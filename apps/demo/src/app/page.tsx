@@ -66,7 +66,7 @@ const DEFAULT_SYSTEM_PROMPT =
 const PROVIDER_ICONS: Record<string, string> = {
   OpenAI: '🟢', Groq: '⚡', Anthropic: '🔮', Gemini: '🔷', Mistral: '🌬️',
   xAI: '✕', DeepSeek: '🔵', OpenRouter: '🔀', Cohere: '🌀', Nvidia: '🟩',
-  OpencodeZen: '🧘', Cerebras: '⚙️', Sambanova: '🔶', Cloudflare: '☁️', Github: '🐙',
+  OpencodeZen: '🧘', Cerebras: '⚙️', Sambanova: '🔶', Cloudflare: '☁️', Github: '🐙', Lumos: '💡', TokenRouter: '🚀',
 };
 
 // ─── Code Block Component ─────────────────────────────────────────────────────

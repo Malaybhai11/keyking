@@ -48,7 +48,7 @@ export { resolveProvider } from "./router.js";
 
 // ─── Default Config ──────────────────────────────────────────────────────────
 
-const DEFAULT_TIMEOUT = 60_000;
+const DEFAULT_TIMEOUT = 900_000; // 15 minutes default for long-thinking reasoning models
 const DEFAULT_MAX_RETRIES = 3;
 
 // ─── Completions API ─────────────────────────────────────────────────────────

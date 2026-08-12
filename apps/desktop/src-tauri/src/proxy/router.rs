@@ -31,7 +31,9 @@ fn extract_bearer(headers: &HeaderMap) -> Option<&str> {
 
 fn model_to_provider(model: &str) -> &'static str {
     let l = model.to_lowercase();
-    if l.contains("gpt-5") || l.contains("zen") {
+    if l.contains("lumos") || l.contains("claude-opus-4") || l.contains("claude-sonnet-4.5") || l.contains("claude-haiku-4") || l.contains("gpt-5.5") {
+        "Lumos"
+    } else if l.contains("gpt-5") || l.contains("zen") {
         "OpencodeZen"
     } else if l.contains("nvidia") || l.contains("nim") {
         "Nvidia"
@@ -51,6 +53,8 @@ fn model_to_provider(model: &str) -> &'static str {
         "DeepSeek"
     } else if l.contains("command") || l.contains("cohere") {
         "Cohere"
+    } else if l.contains("tokenrouter") || l.contains("kimi") || l.contains("moonshot") {
+        "TokenRouter"
     } else {
         "OpenAI"
     }
@@ -66,11 +70,18 @@ fn map_groq_model(model: &str) -> &str {
     }
 }
 
+fn map_tokenrouter_model(model: &str) -> &str {
+    match model {
+        "kimi-k3" | "kimi" | "kimi-k3-free" => "moonshotai/kimi-k3-free",
+        _ => model,
+    }
+}
+
 fn provider_url(provider: &str) -> &'static str {
     match provider {
         "Groq" => "https://api.groq.com/openai/v1/chat/completions",
         "Gemini" => "https://generativelanguage.googleapis.com/v1beta/openai",
-        "Anthropic" => "https://api.anthropic.com/v1",
+        "Anthropic" => "https://api.anthropic.com/v1/messages",
         "Mistral" => "https://api.mistral.ai/v1",
         "xAI" => "https://api.x.ai/v1",
         "DeepSeek" => "https://api.deepseek.com/v1",
@@ -82,6 +93,8 @@ fn provider_url(provider: &str) -> &'static str {
         "Cloudflare" => "https://api.cloudflare.com/client/v4/accounts/default/ai/v1",
         "Nvidia" => "https://integrate.api.nvidia.com/v1",
         "OpencodeZen" => "https://opencode.ai/zen/v1",
+        "Lumos" => "https://api.lumosel.vip/v1/messages",
+        "TokenRouter" => "https://api.tokenrouter.com/v1/chat/completions",
         _ => "https://api.openai.com/v1/chat/completions",
     }
 }
@@ -102,9 +115,10 @@ impl ProxyRouter {
     pub fn new(vault: Arc<VaultState>, system_key: Arc<String>, app_handle: Option<tauri::AppHandle>) -> Self {
         Self {
             client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(60))
-                .connect_timeout(Duration::from_secs(10))
+                .connect_timeout(Duration::from_secs(15))
+                .tcp_keepalive(Duration::from_secs(10))
                 .pool_max_idle_per_host(32)
+                .pool_idle_timeout(Duration::from_secs(300))
                 .build()
                 .expect("Failed to create HTTP client"),
             openai: OpenAIAdapter::new(),
@@ -230,16 +244,16 @@ impl ProxyRouter {
         };
 
         let base_url = provider_url(provider);
-        let url = if base_url.ends_with("/chat/completions") {
+        let url = if base_url.ends_with("/chat/completions") || base_url.ends_with("/messages") {
             base_url.to_string()
         } else {
             format!("{}/chat/completions", base_url)
         };
 
         if is_stream {
-            if provider == "Anthropic" {
+            if provider == "Anthropic" || provider == "Lumos" {
                 // Fetch non-streaming Anthropic response and stream it as a single chunk
-                let ant_result = self.anthropic.chat(&self.client, req, &plaintext).await;
+                let ant_result = self.anthropic.chat_custom(&self.client, req, &plaintext, provider_url(provider)).await;
                 match ant_result {
                     Ok(resp) => {
                         let latency = start.elapsed().as_millis() as u64;
@@ -281,6 +295,8 @@ impl ProxyRouter {
 
             let effective_model = if provider == "Groq" {
                 map_groq_model(&req.model).to_string()
+            } else if provider == "TokenRouter" {
+                map_tokenrouter_model(&req.model).to_string()
             } else {
                 req.model.clone()
             };
@@ -390,7 +406,7 @@ impl ProxyRouter {
         } else {
             let result = match provider {
                 "Groq" => self.groq.chat(&self.client, req, &plaintext).await,
-                "Anthropic" => self.anthropic.chat(&self.client, req, &plaintext).await,
+                "Anthropic" | "Lumos" => self.anthropic.chat_custom(&self.client, req, &plaintext, provider_url(provider)).await,
                 _ => self.openai.chat_custom(&self.client, req, &plaintext, &url).await,
             };
 
@@ -480,7 +496,7 @@ impl ProxyRouter {
     pub async fn get_raw_stream(
         &self,
         req: &NormalizedRequest,
-    ) -> Result<(reqwest::Response, String), String> {
+    ) -> Result<(reqwest::Response, String, String), String> {
         let start = std::time::Instant::now();
 
         let rules_path = self.vault.vault.lock().await.data_dir.join("routing_rules.json");
@@ -495,7 +511,7 @@ impl ProxyRouter {
             custom_rules.iter().map(|r| (r.provider.clone(), r.model.clone())).collect()
         } else {
             let primary = model_to_provider(&req.model);
-            let all = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen"];
+            let all = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos", "TokenRouter"];
             let mut list = vec![(primary.to_string(), req.model.clone())];
             for &p in &all {
                 if p != primary {
@@ -525,7 +541,7 @@ impl ProxyRouter {
                 };
 
                 let base_url = provider_url(provider);
-                let url = if base_url.ends_with("/chat/completions") {
+                let url = if base_url.ends_with("/chat/completions") || base_url.ends_with("/messages") {
                     base_url.to_string()
                 } else {
                     format!("{}/chat/completions", base_url)
@@ -533,36 +549,72 @@ impl ProxyRouter {
 
                 let effective_model = if provider == "Groq" {
                     map_groq_model(model).to_string()
+                } else if provider == "TokenRouter" {
+                    map_tokenrouter_model(model).to_string()
                 } else {
                     model.clone()
                 };
 
-                let mut stream_req = serde_json::json!({
-                    "model": effective_model,
-                    "messages": req.messages,
-                    "stream": true,
-                    "temperature": req.temperature,
-                    "max_tokens": req.max_tokens,
-                    "top_p": req.top_p,
-                    "frequency_penalty": req.frequency_penalty,
-                    "presence_penalty": req.presence_penalty,
-                });
+                let stream_req = if provider == "Anthropic" || provider == "Lumos" {
+                    // Use the model from routing rules, not the original request model
+                    let mut override_req = req.clone();
+                    override_req.model = effective_model.clone();
+                    let mut req_val = self.anthropic.build_request(&override_req, &url);
+                    if let Some(obj) = req_val.as_object_mut() {
+                        obj.insert("stream".to_string(), serde_json::json!(true));
+                    }
+                    req_val
+                } else {
+                    let mut req_val = serde_json::json!({
+                        "model": effective_model,
+                        "messages": req.messages,
+                        "stream": true,
+                        "temperature": req.temperature,
+                        "max_tokens": req.max_tokens,
+                        "top_p": req.top_p,
+                        "frequency_penalty": req.frequency_penalty,
+                        "presence_penalty": req.presence_penalty,
+                    });
 
-                if let Some(obj) = stream_req.as_object_mut() {
-                    for (k, v) in &req.extra {
-                        if provider == "Groq" && k == "tool_choice" && v == "required" {
-                            obj.insert(k.clone(), serde_json::json!("auto"));
-                        } else {
-                            obj.insert(k.clone(), v.clone());
+                    if let Some(obj) = req_val.as_object_mut() {
+                        for (k, v) in &req.extra {
+                            if (provider == "Groq" || provider == "TokenRouter") && k == "tool_choice" && v == "required" {
+                                obj.insert(k.clone(), serde_json::json!("auto"));
+                            } else {
+                                obj.insert(k.clone(), v.clone());
+                            }
                         }
                     }
+                    req_val
+                };
+
+                let mut req_builder = self.client.post(&url);
+                if provider == "Anthropic" || provider == "Lumos" {
+                    if url.contains("lumosel.vip") {
+                        req_builder = req_builder
+                            .header("x-api-key", &plaintext)
+                            .header("anthropic-version", "2023-06-01")
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                            .header("Content-Type", "application/json");
+                    } else {
+                        req_builder = req_builder
+                            .header("x-api-key", &plaintext)
+                            .header("anthropic-version", "2023-06-01")
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                            .header("Content-Type", "application/json");
+                    }
+                } else {
+                    req_builder = req_builder
+                        .header("Authorization", format!("Bearer {}", plaintext))
+                        .header("Content-Type", "application/json")
+                        .header("HTTP-Referer", "https://keyking.ledgion.in")
+                        .header("X-Title", "KeyKing");
                 }
 
-                let upstream = match self.client.post(&url)
-                    .header("Authorization", format!("Bearer {}", plaintext))
-                    .header("Content-Type", "application/json")
-                    .header("HTTP-Referer", "https://keyking.ledgion.in")
-                    .header("X-Title", "KeyKing")
+                eprintln!("[KEYKING DEBUG] Sending to provider={} url={}", provider, url);
+                eprintln!("[KEYKING DEBUG] Body: {}", serde_json::to_string_pretty(&stream_req).unwrap_or_default());
+
+                let upstream = match req_builder
                     .json(&stream_req)
                     .send().await
                 {
@@ -576,8 +628,14 @@ impl ProxyRouter {
 
                 let status = upstream.status().as_u16();
                 if status == 401 || status == 429 || !upstream.status().is_success() {
+                    let body = upstream.text().await.unwrap_or_default();
+                    let err_detail = if body.is_empty() {
+                        format!("HTTP {}", status)
+                    } else {
+                        format!("HTTP {} — {}", status, &body[..body.len().min(500)])
+                    };
                     self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(err_detail) });
                     continue;
                 }
 
@@ -587,7 +645,7 @@ impl ProxyRouter {
                 let event_id = Uuid::new_v4().to_string();
                 self.emit_event(RoutingEvent { id: event_id.clone(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: latency, tokens_used: 0, success: true, error_msg: None });
 
-                return Ok((upstream, event_id));
+                return Ok((upstream, event_id, provider.to_string()));
             }
         }
 
@@ -634,7 +692,7 @@ impl ProxyRouter {
             }
 
             // Fallback: try all other providers that have keys
-            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen"];
+            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos", "TokenRouter"];
             for &provider in &all_providers {
                 if provider == primary_provider {
                     continue;
@@ -655,7 +713,7 @@ impl ProxyRouter {
         let env_key = std::env::var("KEYKING_DEV_KEY").unwrap_or_default();
         if !env_key.is_empty() {
             let base_url = provider_url(primary_provider);
-            let url = if base_url.ends_with("/chat/completions") {
+            let url = if base_url.ends_with("/chat/completions") || base_url.ends_with("/messages") {
                 base_url.to_string()
             } else {
                 format!("{}/chat/completions", base_url)
@@ -694,6 +752,8 @@ impl ProxyRouter {
 
                 let env_model = if primary_provider == "Groq" {
                     map_groq_model(&req.model).to_string()
+                } else if primary_provider == "TokenRouter" {
+                    map_tokenrouter_model(&req.model).to_string()
                 } else {
                     req.model.clone()
                 };

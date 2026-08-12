@@ -59,6 +59,19 @@ async fn check_key(provider: &str, key: &str) -> Result<bool, String> {
                 .send().await.map_err(|e| e.to_string())?;
             Ok(resp.status().is_success())
         }
+        "Lumos" => {
+            let resp = client.get("https://api.lumosel.vip/v1/models")
+                .header("x-api-key", key)
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "TokenRouter" => {
+            let resp = client.get("https://api.tokenrouter.com/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
         _ => Ok(true)
     }
 }
@@ -168,6 +181,23 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             continue;
         }
 
+        if provider == "Lumos" {
+            all_models.push(ModelInfo { id: "claude-opus-4-8".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "claude-opus-4.5".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "claude-sonnet-4.5".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "claude-sonnet-4-5-20250929".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "claude-haiku-4.5".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "claude-haiku-4-5-20251001".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "gpt-5.5".into(), provider: provider.clone() });
+            continue;
+        }
+
+        if provider == "TokenRouter" {
+            all_models.push(ModelInfo { id: "moonshotai/kimi-k3-free".into(), provider: provider.clone() });
+            all_models.push(ModelInfo { id: "kimi-k3-free".into(), provider: provider.clone() });
+            continue;
+        }
+
         let url = match provider.as_str() {
             "OpenAI" => Some("https://api.openai.com/v1/models"),
             "Groq" => Some("https://api.groq.com/openai/v1/models"),
@@ -178,6 +208,8 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             "DeepSeek" => Some("https://api.deepseek.com/models"),
             "Nvidia" => Some("https://integrate.api.nvidia.com/v1/models"),
             "OpencodeZen" => Some("https://opencode.ai/zen/v1/models"),
+            "Lumos" => Some("https://api.lumosel.vip/v1/models"),
+            "TokenRouter" => Some("https://api.tokenrouter.com/v1/models"),
             _ => None,
         };
 

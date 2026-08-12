@@ -24,7 +24,9 @@ export type Provider =
   | "Cloudflare"
   | "Github"
   | "Nvidia"
-  | "OpencodeZen";
+  | "OpencodeZen"
+  | "Lumos"
+  | "TokenRouter";
 
 /** Provider endpoint configuration. */
 export interface ProviderConfig {
