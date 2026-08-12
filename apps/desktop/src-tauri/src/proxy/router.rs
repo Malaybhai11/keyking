@@ -77,6 +77,25 @@ fn map_tokenrouter_model(model: &str) -> &str {
     }
 }
 
+/// Claude Code traffic arrives as `gpt-4o` via the Anthropic compatibility layer
+/// (proxy/anthropic.rs). OpenCode Zen only serves its own curated catalog IDs, so
+/// the implicit legacy alias must be remapped or Zen rejects the request.
+///
+/// The fallback model is overridable via the KEYKING_ZEN_DEFAULT_MODEL env var so
+/// a Zen catalog change never requires a rebuild and redeploy. Models chosen
+/// explicitly through routing rules pass through untouched. This is a pure string
+/// match: no network calls, and no cost when Zen is not in the routing path.
+fn map_opencode_zen_model(model: &str) -> String {
+    const DEFAULT_ZEN_MODEL: &str = "big-pickle";
+    match model {
+        "gpt-4o" => std::env::var("KEYKING_ZEN_DEFAULT_MODEL")
+            .ok()
+            .filter(|m| !m.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_ZEN_MODEL.to_string()),
+        other => other.to_string(),
+    }
+}
+
 fn provider_url(provider: &str) -> &'static str {
     match provider {
         "Groq" => "https://api.groq.com/openai/v1/chat/completions",
@@ -97,6 +116,49 @@ fn provider_url(provider: &str) -> &'static str {
         "TokenRouter" => "https://api.tokenrouter.com/v1/chat/completions",
         _ => "https://api.openai.com/v1/chat/completions",
     }
+}
+
+/// Every provider name with a dedicated endpoint in provider_url(). Used as a
+/// guard before dispatching: an unknown provider must never reach the catch-all
+/// arm, because that would send its API key to the wrong host (credential leak)
+/// and the resulting 401 would wrongly mark the key invalid.
+const KNOWN_PROVIDERS: &[&str] = &[
+    "OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek",
+    "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github",
+    "Nvidia", "OpencodeZen", "Lumos", "TokenRouter",
+];
+
+/// How the router may proceed after a failed upstream attempt.
+#[derive(Debug, Clone, Copy)]
+enum FailAction {
+    /// Try the next key for the same provider (401, 429, network errors, 5xx).
+    NextKey,
+    /// Skip the remaining keys for this provider — the request itself was
+    /// rejected (400/404/422), so every key fails identically — but keep
+    /// failing over to the next provider or routing rule.
+    NextProvider,
+}
+
+/// A classified upstream failure with enough detail to explain it to the caller.
+#[derive(Debug)]
+struct UpstreamFailure {
+    action: FailAction,
+    summary: String,
+}
+
+impl UpstreamFailure {
+    fn next_key(summary: String) -> Self {
+        Self { action: FailAction::NextKey, summary }
+    }
+    fn next_provider(summary: String) -> Self {
+        Self { action: FailAction::NextProvider, summary }
+    }
+}
+
+/// 400/404/422 mean the request shape itself was rejected — deterministic for
+/// every key on this provider, but another provider may still serve it.
+fn is_deterministic_4xx(status: u16) -> bool {
+    status == 400 || status == 404 || status == 422
 }
 
 pub struct ProxyRouter {
@@ -223,6 +285,29 @@ impl ProxyRouter {
         Self::update_event_tokens_static(self.vault.clone(), self.app_handle.clone(), event_id, tokens);
     }
 
+    /// Removes keys whose value is JSON null from a request body built with
+    /// serde_json::json!(). json!() serializes Option::None as explicit null,
+    /// bypassing the skip_serializing_if attributes on NormalizedRequest, and
+    /// strict OpenAI-compatible upstreams (e.g. SGLang) reject null numeric
+    /// params like frequency_penalty/presence_penalty with a 400.
+    fn strip_null_fields(body: &mut serde_json::Value) {
+        if let Some(obj) = body.as_object_mut() {
+            obj.retain(|_, v| !v.is_null());
+        }
+    }
+
+    /// Reads up to 500 chars of an upstream error body so the routing log and
+    /// the caller see the provider's actual message (e.g. quota exhausted vs
+    /// unknown model) instead of a bare status code.
+    async fn upstream_error_detail(upstream: reqwest::Response, prefix: String) -> String {
+        let body = upstream.text().await.unwrap_or_default();
+        if body.is_empty() {
+            prefix
+        } else {
+            format!("{}: {}", prefix, body.chars().take(500).collect::<String>())
+        }
+    }
+
     async fn try_key(
         &self,
         key_entry: &crate::vault::StoredKeyEntry,
@@ -230,16 +315,23 @@ impl ProxyRouter {
         req: &NormalizedRequest,
         is_stream: bool,
         start: std::time::Instant,
-    ) -> Result<Response, ()> {
+    ) -> Result<Response, UpstreamFailure> {
         if !self.circuit_breaker.is_available(&key_entry.id).await {
-            return Err(());
+            return Err(UpstreamFailure::next_key("circuit breaker open".to_string()));
+        }
+
+        // Guard: never send a provider's key to the catch-all endpoint in
+        // provider_url(). An unknown provider name would leak the credential to
+        // the wrong host and get the key wrongly invalidated on the 401.
+        if !KNOWN_PROVIDERS.contains(&provider) {
+            return Err(UpstreamFailure::next_provider(format!("unknown provider '{}'", provider)));
         }
 
         let plaintext = {
             let vault = self.vault.vault.lock().await;
             match vault.get_plaintext_key(&key_entry.id) {
                 Some(Ok(k)) => k,
-                _ => return Err(()),
+                _ => return Err(UpstreamFailure::next_key("could not decrypt key".to_string())),
             }
         };
 
@@ -286,9 +378,21 @@ impl ProxyRouter {
                         });
                         return Ok(Sse::new(stream).into_response());
                     }
-                    Err(_) => {
-                        self.circuit_breaker.record_failure(&key_entry.id).await;
-                        return Err(());
+                    Err(e) => {
+                        let summary = e.to_string();
+                        let failure = match &e {
+                            // Deterministic request error: not the key's fault, don't
+                            // burn breaker budget — but this provider+model can never
+                            // serve this request shape, so move to the next provider.
+                            AdapterError::ApiError { status, .. } if is_deterministic_4xx(*status) => {
+                                UpstreamFailure::next_provider(summary)
+                            }
+                            _ => {
+                                self.circuit_breaker.record_failure(&key_entry.id).await;
+                                UpstreamFailure::next_key(summary)
+                            }
+                        };
+                        return Err(failure);
                     }
                 }
             }
@@ -297,6 +401,8 @@ impl ProxyRouter {
                 map_groq_model(&req.model).to_string()
             } else if provider == "TokenRouter" {
                 map_tokenrouter_model(&req.model).to_string()
+            } else if provider == "OpencodeZen" {
+                map_opencode_zen_model(&req.model)
             } else {
                 req.model.clone()
             };
@@ -318,6 +424,9 @@ impl ProxyRouter {
                 "frequency_penalty": req.frequency_penalty,
                 "presence_penalty": req.presence_penalty,
             });
+
+            // Drop optional fields the client never set instead of sending null.
+            Self::strip_null_fields(&mut stream_req);
 
             if let Some(obj) = stream_req.as_object_mut() {
                 for (k, v) in &req.extra {
@@ -341,7 +450,7 @@ impl ProxyRouter {
                 Err(e) => {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
                     self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(e.to_string()) });
-                    return Err(());
+                    return Err(UpstreamFailure::next_key(e.to_string()));
                 }
             };
 
@@ -350,17 +459,27 @@ impl ProxyRouter {
                 self.vault.vault.lock().await.set_key_validity(&key_entry.id, false);
                 self.circuit_breaker.trip(&key_entry.id, Duration::from_secs(300)).await;
                 self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 401 Unauthorized")) });
-                return Err(());
+                return Err(UpstreamFailure::next_key("HTTP 401 Unauthorized".to_string()));
             }
             if status == 429 {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 429 Rate Limited")) });
-                return Err(());
+                let detail = Self::upstream_error_detail(upstream, "HTTP 429 Rate Limited".to_string()).await;
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail.clone()) });
+                return Err(UpstreamFailure::next_key(detail));
+            }
+            if is_deterministic_4xx(status) {
+                // The request shape itself was rejected; every key on this provider
+                // would fail identically. Don't burn circuit-breaker budget on the
+                // key — just move to the next provider / routing rule.
+                let detail = Self::upstream_error_detail(upstream, format!("HTTP {}", status)).await;
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail.clone()) });
+                return Err(UpstreamFailure::next_provider(detail));
             }
             if !upstream.status().is_success() {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
-                return Err(());
+                let detail = Self::upstream_error_detail(upstream, format!("HTTP {}", status)).await;
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail.clone()) });
+                return Err(UpstreamFailure::next_key(detail));
             }
 
             // Extract and update rate limit quota from headers
@@ -404,10 +523,16 @@ impl ProxyRouter {
 
             Ok(Sse::new(stream).into_response())
         } else {
+            // Remap the implicit legacy model alias for providers with their own
+            // catalog (OpenCode Zen); explicit routing-rule models are untouched.
+            let mut effective_req = req.clone();
+            if provider == "OpencodeZen" {
+                effective_req.model = map_opencode_zen_model(&req.model);
+            }
             let result = match provider {
-                "Groq" => self.groq.chat(&self.client, req, &plaintext).await,
-                "Anthropic" | "Lumos" => self.anthropic.chat_custom(&self.client, req, &plaintext, provider_url(provider)).await,
-                _ => self.openai.chat_custom(&self.client, req, &plaintext, &url).await,
+                "Groq" => self.groq.chat(&self.client, &effective_req, &plaintext).await,
+                "Anthropic" | "Lumos" => self.anthropic.chat_custom(&self.client, &effective_req, &plaintext, provider_url(provider)).await,
+                _ => self.openai.chat_custom(&self.client, &effective_req, &plaintext, &url).await,
             };
 
             match result {
@@ -427,19 +552,27 @@ impl ProxyRouter {
                     Ok(([("Content-Type", "application/json"), ("x-keyking-latency-ms", &latency.to_string())], body).into_response())
                 }
                 Err(AdapterError::ApiError { status, message }) => {
+                    let summary = format!("API Error {}: {}", status, message);
                     if status == 401 {
                         self.vault.vault.lock().await.set_key_validity(&key_entry.id, false);
                         self.circuit_breaker.trip(&key_entry.id, Duration::from_secs(300)).await;
-                    } else {
-                        self.circuit_breaker.record_failure(&key_entry.id).await;
+                        self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(summary.clone()) });
+                        return Err(UpstreamFailure::next_key(summary));
                     }
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("API Error {}: {}", status, message)) });
-                    Err(())
+                    if is_deterministic_4xx(status) {
+                        // Deterministic request error: skip remaining keys for this
+                        // provider, but keep failing over to the next one.
+                        self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(summary.clone()) });
+                        return Err(UpstreamFailure::next_provider(summary));
+                    }
+                    self.circuit_breaker.record_failure(&key_entry.id).await;
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(summary.clone()) });
+                    Err(UpstreamFailure::next_key(summary))
                 }
                 Err(e) => {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
                     self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(e.to_string()) });
-                    Err(())
+                    Err(UpstreamFailure::next_key(e.to_string()))
                 }
             }
         }
@@ -451,14 +584,14 @@ impl ProxyRouter {
         req: &NormalizedRequest,
         is_stream: bool,
         start: std::time::Instant,
-    ) -> Result<Response, String> {
+    ) -> Result<Response, UpstreamFailure> {
         let keys = {
             let vault = self.vault.vault.lock().await;
             vault.keys_by_provider(provider)
         };
 
         if keys.is_empty() {
-            return Err(format!("No keys for {}", provider));
+            return Err(UpstreamFailure::next_provider(format!("no keys configured for {}", provider)));
         }
 
         let mut key_ids: Vec<String> = keys.iter().filter(|k| k.is_valid).map(|k| k.id.clone()).collect();
@@ -482,13 +615,22 @@ impl ProxyRouter {
             }
         }
 
+        let mut last_failure: Option<UpstreamFailure> = None;
         for key_entry in &ordered_keys {
             match self.try_key(key_entry, provider, req, is_stream, start).await {
                 Ok(response) => return Ok(response),
-                Err(()) => continue,
+                Err(f) => {
+                    // Deterministic 4xx: the same request fails on every key for
+                    // this provider — skip the rest and let the caller move on.
+                    let skip_remaining_keys = matches!(f.action, FailAction::NextProvider);
+                    last_failure = Some(f);
+                    if skip_remaining_keys {
+                        break;
+                    }
+                }
             }
         }
-        Err("All keys failed".to_string())
+        Err(last_failure.unwrap_or_else(|| UpstreamFailure::next_key("all keys failed".to_string())))
     }
 
     /// Returns the raw upstream reqwest::Response for streaming requests.
@@ -521,22 +663,42 @@ impl ProxyRouter {
             list
         };
 
+        // Per-attempt outcomes, surfaced in the final error if everything fails
+        // so the caller can see exactly why each provider+model was rejected.
+        let mut failures: Vec<String> = Vec::new();
+
         for (provider, model) in &providers_to_try {
+            // Guard: never send a provider's key to the catch-all endpoint in
+            // provider_url() — that leaks the credential to the wrong host.
+            if !KNOWN_PROVIDERS.contains(&provider.as_str()) {
+                failures.push(format!("{}:{} — skipped (unknown provider)", provider, model));
+                continue;
+            }
+
             let keys = {
                 let vault = self.vault.vault.lock().await;
                 vault.keys_by_provider(provider)
             };
             let valid_keys: Vec<_> = keys.iter().filter(|k| k.is_valid).collect();
-            if valid_keys.is_empty() { continue; }
+            if valid_keys.is_empty() {
+                failures.push(format!("{}:{} — skipped (no valid keys)", provider, model));
+                continue;
+            }
 
             for key_entry in &valid_keys {
-                if !self.circuit_breaker.is_available(&key_entry.id).await { continue; }
+                if !self.circuit_breaker.is_available(&key_entry.id).await {
+                    failures.push(format!("{}:{} — skipped (circuit breaker open)", provider, model));
+                    continue;
+                }
 
                 let plaintext = {
                     let vault = self.vault.vault.lock().await;
                     match vault.get_plaintext_key(&key_entry.id) {
                         Some(Ok(k)) => k,
-                        _ => continue,
+                        _ => {
+                            failures.push(format!("{}:{} — could not decrypt key", provider, model));
+                            continue;
+                        }
                     }
                 };
 
@@ -551,6 +713,8 @@ impl ProxyRouter {
                     map_groq_model(model).to_string()
                 } else if provider == "TokenRouter" {
                     map_tokenrouter_model(model).to_string()
+                } else if provider == "OpencodeZen" {
+                    map_opencode_zen_model(model)
                 } else {
                     model.clone()
                 };
@@ -575,6 +739,9 @@ impl ProxyRouter {
                         "frequency_penalty": req.frequency_penalty,
                         "presence_penalty": req.presence_penalty,
                     });
+
+                    // Drop optional fields the client never set instead of sending null.
+                    Self::strip_null_fields(&mut req_val);
 
                     if let Some(obj) = req_val.as_object_mut() {
                         for (k, v) in &req.extra {
@@ -622,20 +789,26 @@ impl ProxyRouter {
                     Err(e) => {
                         self.circuit_breaker.record_failure(&key_entry.id).await;
                         self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(e.to_string()) });
+                        failures.push(format!("{}:{} — {}", provider, model, e));
                         continue;
                     }
                 };
 
                 let status = upstream.status().as_u16();
                 if status == 401 || status == 429 || !upstream.status().is_success() {
-                    let body = upstream.text().await.unwrap_or_default();
-                    let err_detail = if body.is_empty() {
-                        format!("HTTP {}", status)
-                    } else {
-                        format!("HTTP {} — {}", status, &body[..body.len().min(500)])
-                    };
+                    let detail = Self::upstream_error_detail(upstream, format!("HTTP {}", status)).await;
+                    if is_deterministic_4xx(status) {
+                        // The request shape itself was rejected: skip the remaining
+                        // keys for this provider (every key fails identically) but
+                        // keep failing over to the next provider / routing rule.
+                        // Don't burn circuit-breaker budget — it's not the key's fault.
+                        self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail.clone()) });
+                        failures.push(format!("{}:{} — {}", provider, model, detail));
+                        break;
+                    }
                     self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(err_detail) });
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail.clone()) });
+                    failures.push(format!("{}:{} — {}", provider, model, detail));
                     continue;
                 }
 
@@ -649,7 +822,11 @@ impl ProxyRouter {
             }
         }
 
-        Err("All providers/keys exhausted".to_string())
+        if failures.is_empty() {
+            Err("All providers/keys exhausted (no provider had usable keys)".to_string())
+        } else {
+            Err(format!("All providers/keys exhausted. Attempts: {}", failures.join(" | ")))
+        }
     }
 
     pub async fn handle_chat(
@@ -675,20 +852,27 @@ impl ProxyRouter {
             }
         }
 
+        // Per-attempt outcomes, surfaced in the final response if everything
+        // fails so the caller can see exactly why each provider+model was
+        // rejected instead of a misleading "No valid API keys available".
+        let mut attempts: Vec<String> = Vec::new();
+
         if !custom_rules.is_empty() {
             for rule in &custom_rules {
                 let mut modified_req = req.clone();
                 modified_req.model = rule.model.clone();
-                if let Ok(response) = router.try_provider(&rule.provider, &modified_req, is_stream, start).await {
-                    return response;
+                match router.try_provider(&rule.provider, &modified_req, is_stream, start).await {
+                    Ok(response) => return response,
+                    Err(f) => attempts.push(format!("{}:{} — {}", rule.provider, rule.model, f.summary)),
                 }
             }
         } else {
             let primary_provider = model_to_provider(&req.model);
 
             // Try primary provider first
-            if let Ok(response) = router.try_provider(primary_provider, &req, is_stream, start).await {
-                return response;
+            match router.try_provider(primary_provider, &req, is_stream, start).await {
+                Ok(response) => return response,
+                Err(f) => attempts.push(format!("{}:{} — {}", primary_provider, req.model, f.summary)),
             }
 
             // Fallback: try all other providers that have keys
@@ -697,8 +881,9 @@ impl ProxyRouter {
                 if provider == primary_provider {
                     continue;
                 }
-                if let Ok(response) = router.try_provider(provider, &req, is_stream, start).await {
-                    return response;
+                match router.try_provider(provider, &req, is_stream, start).await {
+                    Ok(response) => return response,
+                    Err(f) => attempts.push(format!("{}:{} — {}", provider, req.model, f.summary)),
                 }
             }
         }
@@ -754,6 +939,8 @@ impl ProxyRouter {
                     map_groq_model(&req.model).to_string()
                 } else if primary_provider == "TokenRouter" {
                     map_tokenrouter_model(&req.model).to_string()
+                } else if primary_provider == "OpencodeZen" {
+                    map_opencode_zen_model(&req.model)
                 } else {
                     req.model.clone()
                 };
@@ -774,6 +961,9 @@ impl ProxyRouter {
                     "frequency_penalty": req.frequency_penalty,
                     "presence_penalty": req.presence_penalty,
                 });
+
+                // Drop optional fields the client never set instead of sending null.
+                Self::strip_null_fields(&mut stream_req);
 
                 if let Some(obj) = stream_req.as_object_mut() {
                     for (k, v) in &req.extra {
@@ -822,19 +1012,36 @@ impl ProxyRouter {
             }
         }
 
-        router.emit_event(RoutingEvent {
-            id: Uuid::new_v4().to_string(),
-            timestamp: now_secs(),
-            provider: primary_provider.to_string(),
-            latency_ms: start.elapsed().as_millis() as u64,
-            tokens_used: 0,
-            success: false,
-            error_msg: Some("No valid API keys available".to_string()),
-        });
+        if attempts.is_empty() {
+            router.emit_event(RoutingEvent {
+                id: Uuid::new_v4().to_string(),
+                timestamp: now_secs(),
+                provider: primary_provider.to_string(),
+                latency_ms: start.elapsed().as_millis() as u64,
+                tokens_used: 0,
+                success: false,
+                error_msg: Some("No valid API keys available".to_string()),
+            });
 
-        (StatusCode::UNAUTHORIZED, Json(json!({
-            "error": "No valid API keys available for any provider. Open the Key King app and add provider keys (e.g., OpenAI) in the Keys page."
-        }))).into_response()
+            (StatusCode::UNAUTHORIZED, Json(json!({
+                "error": "No valid API keys available for any provider. Open the Key King app and add provider keys (e.g., OpenAI) in the Keys page."
+            }))).into_response()
+        } else {
+            router.emit_event(RoutingEvent {
+                id: Uuid::new_v4().to_string(),
+                timestamp: now_secs(),
+                provider: primary_provider.to_string(),
+                latency_ms: start.elapsed().as_millis() as u64,
+                tokens_used: 0,
+                success: false,
+                error_msg: Some(format!("All {} routing targets failed", attempts.len())),
+            });
+
+            (StatusCode::BAD_GATEWAY, Json(json!({
+                "error": "All routing targets failed",
+                "attempts": attempts,
+            }))).into_response()
+        }
     }
 
     pub async fn handle_models(State(_router): State<Arc<Self>>) -> impl IntoResponse {
