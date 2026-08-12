@@ -66,6 +66,26 @@ fn map_groq_model(model: &str) -> &str {
     }
 }
 
+/// Claude Code traffic arrives as `gpt-4o` via the Anthropic compatibility layer
+/// (proxy/anthropic.rs). OpenCode Zen only serves its own curated catalog IDs, so
+/// the implicit legacy alias must be remapped or Zen rejects the request —
+/// observed in the wild as HTTP 429 churn across every key.
+///
+/// The fallback model is overridable via the KEYKING_ZEN_DEFAULT_MODEL env var so
+/// a Zen catalog change never requires a rebuild and redeploy. Models chosen
+/// explicitly through routing rules pass through untouched. This is a pure string
+/// match: no network calls, no cost when Zen is not in the routing path.
+fn map_opencode_zen_model(model: &str) -> String {
+    const DEFAULT_ZEN_MODEL: &str = "big-pickle";
+    match model {
+        "gpt-4o" => std::env::var("KEYKING_ZEN_DEFAULT_MODEL")
+            .ok()
+            .filter(|m| !m.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_ZEN_MODEL.to_string()),
+        other => other.to_string(),
+    }
+}
+
 fn provider_url(provider: &str) -> &'static str {
     match provider {
         "Groq" => "https://api.groq.com/openai/v1/chat/completions",
@@ -220,6 +240,18 @@ impl ProxyRouter {
         }
     }
 
+    /// Reads up to `max` chars of an upstream error body for the routing log, so
+    /// 429s and other failures show the provider's actual message (e.g. quota
+    /// exhausted vs unknown model) instead of a bare status code.
+    async fn upstream_error_detail(upstream: reqwest::Response, prefix: String) -> String {
+        let body = upstream.text().await.unwrap_or_default();
+        if body.is_empty() {
+            prefix
+        } else {
+            format!("{}: {}", prefix, body.chars().take(500).collect::<String>())
+        }
+    }
+
     async fn try_key(
         &self,
         key_entry: &crate::vault::StoredKeyEntry,
@@ -292,6 +324,8 @@ impl ProxyRouter {
 
             let effective_model = if provider == "Groq" {
                 map_groq_model(&req.model).to_string()
+            } else if provider == "OpencodeZen" {
+                map_opencode_zen_model(&req.model)
             } else {
                 req.model.clone()
             };
@@ -352,7 +386,8 @@ impl ProxyRouter {
             }
             if status == 429 {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 429 Rate Limited")) });
+                let detail = Self::upstream_error_detail(upstream, "HTTP 429 Rate Limited".to_string()).await;
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail) });
                 return Err(());
             }
             // 400/404/422 are deterministic request-shape errors: every key and
@@ -365,7 +400,8 @@ impl ProxyRouter {
             }
             if !upstream.status().is_success() {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
+                let detail = Self::upstream_error_detail(upstream, format!("HTTP {}", status)).await;
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail) });
                 return Err(());
             }
 
@@ -410,10 +446,16 @@ impl ProxyRouter {
 
             Ok(Sse::new(stream).into_response())
         } else {
+            // Remap the implicit legacy model alias for providers with their own
+            // catalog (OpenCode Zen); explicit routing-rule models are untouched.
+            let mut effective_req = req.clone();
+            if provider == "OpencodeZen" {
+                effective_req.model = map_opencode_zen_model(&req.model);
+            }
             let result = match provider {
-                "Groq" => self.groq.chat(&self.client, req, &plaintext).await,
-                "Anthropic" => self.anthropic.chat(&self.client, req, &plaintext).await,
-                _ => self.openai.chat_custom(&self.client, req, &plaintext, &url).await,
+                "Groq" => self.groq.chat(&self.client, &effective_req, &plaintext).await,
+                "Anthropic" => self.anthropic.chat(&self.client, &effective_req, &plaintext).await,
+                _ => self.openai.chat_custom(&self.client, &effective_req, &plaintext, &url).await,
             };
 
             match result {
@@ -555,6 +597,8 @@ impl ProxyRouter {
 
                 let effective_model = if provider == "Groq" {
                     map_groq_model(model).to_string()
+                } else if provider == "OpencodeZen" {
+                    map_opencode_zen_model(model)
                 } else {
                     model.clone()
                 };
@@ -610,7 +654,8 @@ impl ProxyRouter {
                 }
                 if status == 401 || status == 429 || !upstream.status().is_success() {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
+                    let detail = Self::upstream_error_detail(upstream, format!("HTTP {}", status)).await;
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail) });
                     continue;
                 }
 
@@ -727,6 +772,8 @@ impl ProxyRouter {
 
                 let env_model = if primary_provider == "Groq" {
                     map_groq_model(&req.model).to_string()
+                } else if primary_provider == "OpencodeZen" {
+                    map_opencode_zen_model(&req.model)
                 } else {
                     req.model.clone()
                 };
