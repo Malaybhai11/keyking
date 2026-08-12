@@ -66,6 +66,17 @@ fn map_groq_model(model: &str) -> &str {
     }
 }
 
+// Claude Code is translated to gpt-4o by the Anthropic compatibility layer.
+// OpenCode Zen does not expose that legacy model through chat/completions;
+// use its current free chat-compatible model when Zen is selected implicitly.
+// Explicit routing rules keep their chosen model unchanged.
+fn map_opencode_model(model: &str) -> &str {
+    match model {
+        "gpt-4o" => "big-pickle",
+        _ => model,
+    }
+}
+
 fn provider_url(provider: &str) -> &'static str {
     match provider {
         "Groq" => "https://api.groq.com/openai/v1/chat/completions",
@@ -281,6 +292,8 @@ impl ProxyRouter {
 
             let effective_model = if provider == "Groq" {
                 map_groq_model(&req.model).to_string()
+            } else if provider == "OpencodeZen" {
+                map_opencode_model(&req.model).to_string()
             } else {
                 req.model.clone()
             };
@@ -304,6 +317,8 @@ impl ProxyRouter {
             });
 
             if let Some(obj) = stream_req.as_object_mut() {
+                // OpenAI-compatible providers reject optional fields sent as JSON null.
+                obj.retain(|_, value| !value.is_null());
                 for (k, v) in &req.extra {
                     if provider == "Groq" && k == "tool_choice" && v == "required" {
                         obj.insert(k.clone(), serde_json::json!("auto"));
@@ -338,7 +353,13 @@ impl ProxyRouter {
             }
             if status == 429 {
                 self.circuit_breaker.record_failure(&key_entry.id).await;
-                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP 429 Rate Limited")) });
+                let body = upstream.text().await.unwrap_or_default();
+                let detail = if body.is_empty() {
+                    "HTTP 429 Rate Limited".to_string()
+                } else {
+                    format!("HTTP 429 Rate Limited: {}", body.chars().take(500).collect::<String>())
+                };
+                self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail) });
                 return Err(());
             }
             if !upstream.status().is_success() {
@@ -388,10 +409,14 @@ impl ProxyRouter {
 
             Ok(Sse::new(stream).into_response())
         } else {
+            let mut effective_req = req.clone();
+            if provider == "OpencodeZen" {
+                effective_req.model = map_opencode_model(&req.model).to_string();
+            }
             let result = match provider {
-                "Groq" => self.groq.chat(&self.client, req, &plaintext).await,
-                "Anthropic" => self.anthropic.chat(&self.client, req, &plaintext).await,
-                _ => self.openai.chat_custom(&self.client, req, &plaintext, &url).await,
+                "Groq" => self.groq.chat(&self.client, &effective_req, &plaintext).await,
+                "Anthropic" => self.anthropic.chat(&self.client, &effective_req, &plaintext).await,
+                _ => self.openai.chat_custom(&self.client, &effective_req, &plaintext, &url).await,
             };
 
             match result {
@@ -533,6 +558,8 @@ impl ProxyRouter {
 
                 let effective_model = if provider == "Groq" {
                     map_groq_model(model).to_string()
+                } else if provider == "OpencodeZen" {
+                    map_opencode_model(model).to_string()
                 } else {
                     model.clone()
                 };
@@ -549,6 +576,8 @@ impl ProxyRouter {
                 });
 
                 if let Some(obj) = stream_req.as_object_mut() {
+                    // Omit unset optional fields instead of sending JSON null.
+                    obj.retain(|_, value| !value.is_null());
                     for (k, v) in &req.extra {
                         if provider == "Groq" && k == "tool_choice" && v == "required" {
                             obj.insert(k.clone(), serde_json::json!("auto"));
@@ -577,7 +606,13 @@ impl ProxyRouter {
                 let status = upstream.status().as_u16();
                 if status == 401 || status == 429 || !upstream.status().is_success() {
                     self.circuit_breaker.record_failure(&key_entry.id).await;
-                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(format!("HTTP {}", status)) });
+                    let body = upstream.text().await.unwrap_or_default();
+                    let detail = if body.is_empty() {
+                        format!("HTTP {}", status)
+                    } else {
+                        format!("HTTP {}: {}", status, body.chars().take(500).collect::<String>())
+                    };
+                    self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail) });
                     continue;
                 }
 
@@ -694,6 +729,8 @@ impl ProxyRouter {
 
                 let env_model = if primary_provider == "Groq" {
                     map_groq_model(&req.model).to_string()
+                } else if primary_provider == "OpencodeZen" {
+                    map_opencode_model(&req.model).to_string()
                 } else {
                     req.model.clone()
                 };
@@ -716,6 +753,8 @@ impl ProxyRouter {
                 });
 
                 if let Some(obj) = stream_req.as_object_mut() {
+                    // Omit unset optional fields instead of sending JSON null.
+                    obj.retain(|_, value| !value.is_null());
                     for (k, v) in &req.extra {
                         if primary_provider == "Groq" && k == "tool_choice" && v == "required" {
                             obj.insert(k.clone(), serde_json::json!("auto"));
