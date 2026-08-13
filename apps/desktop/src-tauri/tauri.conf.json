@@ -4,8 +4,8 @@
   "version": "3.3.1",
   "identifier": "com.keyking.desktop",
   "build": {
-    "beforeBuildCommand": "npm run build",
-    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run icons:generate && npm run build",
+    "beforeDevCommand": "npm run icons:generate && npm run dev",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
@@ -29,6 +29,7 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ]
