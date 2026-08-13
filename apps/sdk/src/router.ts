@@ -71,7 +71,8 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     openaiCompatible: true,
   },
   Github: {
-    baseUrl: "https://models.inference.ai.azure.com/chat/completions",
+    // GitHub Models moved off the legacy Azure host to models.github.ai.
+    baseUrl: "https://models.github.ai/inference/chat/completions",
     openaiCompatible: true,
   },
   Nvidia: {
@@ -90,6 +91,30 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     baseUrl: "https://api.tokenrouter.com/v1/chat/completions",
     openaiCompatible: true,
   },
+  Zai: {
+    baseUrl: "https://api.z.ai/api/paas/v4/chat/completions",
+    openaiCompatible: true,
+  },
+  ModelScope: {
+    baseUrl: "https://api-inference.modelscope.cn/v1/chat/completions",
+    openaiCompatible: true,
+  },
+  SiliconFlow: {
+    baseUrl: "https://api.siliconflow.com/v1/chat/completions",
+    openaiCompatible: true,
+  },
+  Requesty: {
+    baseUrl: "https://router.requesty.ai/v1/chat/completions",
+    openaiCompatible: true,
+  },
+  Chutes: {
+    baseUrl: "https://llm.chutes.ai/v1/chat/completions",
+    openaiCompatible: true,
+  },
+  OllamaCloud: {
+    baseUrl: "https://ollama.com/v1/chat/completions",
+    openaiCompatible: true,
+  },
 };
 
 // ─── Model → Provider Mapping ────────────────────────────────────────────────
@@ -103,6 +128,13 @@ const MODEL_PREFIX_MAP: [string, Provider][] = [
   ["claude-sonnet-4.5", "Lumos"],
   ["claude-haiku-4", "Lumos"],
   ["gpt-5.5", "Lumos"],
+  ["glm", "Zai"],
+  ["zai", "Zai"],
+  ["modelscope", "ModelScope"],
+  ["siliconflow", "SiliconFlow"],
+  ["requesty", "Requesty"],
+  ["chutes", "Chutes"],
+  ["ollama", "OllamaCloud"],
   ["gpt-", "OpenAI"],
   ["o1", "OpenAI"],
   ["o3", "OpenAI"],
@@ -170,7 +202,7 @@ function mapToAnthropicModel(model: string): string | null {
 function getFallbackProviders(primary: Provider): Provider[] {
   const allProviders: Provider[] = [
     "OpenAI", "Groq", "Anthropic", "Gemini", "Mistral",
-    "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos"
+    "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos", "TokenRouter", "Zai", "ModelScope", "SiliconFlow", "Requesty", "Chutes", "OllamaCloud"
   ];
   
   const fallbacks: Provider[] = [];
@@ -289,7 +321,26 @@ async function sendToProvider(
         signal: controller.signal,
       });
     } else {
-      const body = { ...request, model, stream: isStream };
+      // Gemini's OpenAI-compatible layer returns HTTP 400 for OpenAI-only fields
+      // (store, logprobs, logit_bias, n, user, parallel_tool_calls), for
+      // stream_options, and for frequency/presence penalties on gemini-2.5+
+      // models. Strip them before dispatch.
+      const GEMINI_UNSUPPORTED = new Set([
+        "stream_options",
+        "frequency_penalty",
+        "presence_penalty",
+        "store",
+        "logprobs",
+        "top_logprobs",
+        "logit_bias",
+        "n",
+        "user",
+        "parallel_tool_calls",
+      ]);
+      const rawBody: Record<string, unknown> = { ...request, model, stream: isStream };
+      const body = provider === "Gemini"
+        ? Object.fromEntries(Object.entries(rawBody).filter(([k, v]) => v !== undefined && !GEMINI_UNSUPPORTED.has(k)))
+        : rawBody;
       response = await fetch(config.baseUrl, {
         method: "POST",
         headers: {
