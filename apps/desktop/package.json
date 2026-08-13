@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
+    "icons:generate": "tauri icon src-tauri/icon-source.svg --output src-tauri/icons",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
