@@ -33,6 +33,18 @@ fn model_to_provider(model: &str) -> &'static str {
     let l = model.to_lowercase();
     if l.contains("lumos") || l.contains("claude-opus-4") || l.contains("claude-sonnet-4.5") || l.contains("claude-haiku-4") || l.contains("gpt-5.5") {
         "Lumos"
+    } else if l.contains("glm") || l.contains("zai") || l.contains("z-ai") {
+        "Zai"
+    } else if l.contains("modelscope") {
+        "ModelScope"
+    } else if l.contains("siliconflow") {
+        "SiliconFlow"
+    } else if l.contains("requesty") {
+        "Requesty"
+    } else if l.contains("chutes") {
+        "Chutes"
+    } else if l.contains("ollama") {
+        "OllamaCloud"
     } else if l.contains("gpt-5") || l.contains("zen") {
         "OpencodeZen"
     } else if l.contains("nvidia") || l.contains("nim") {
@@ -96,6 +108,39 @@ fn map_opencode_zen_model(model: &str) -> String {
     }
 }
 
+/// Z.ai serves the GLM family only, so the implicit `gpt-4o` alias coming from
+/// the Anthropic compatibility layer must be remapped. Defaults to the
+/// permanently-free coding-tuned Flash model, overridable via
+/// KEYKING_ZAI_DEFAULT_MODEL so a catalog change needs no rebuild.
+fn map_zai_model(model: &str) -> String {
+    const DEFAULT_ZAI_MODEL: &str = "glm-4.7-flash";
+    match model {
+        "gpt-4o" => std::env::var("KEYKING_ZAI_DEFAULT_MODEL")
+            .ok()
+            .filter(|m| !m.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_ZAI_MODEL.to_string()),
+        other => other.to_string(),
+    }
+}
+
+/// GitHub Models (models.github.ai) requires publisher-prefixed model IDs such as
+/// `openai/gpt-4o`, unlike the legacy Azure host which accepted bare names. Only
+/// bare OpenAI-family names are prefixed; anything already containing a `/` is
+/// passed through so explicitly-configured routing rules always win. A wrong
+/// guess is harmless: the resulting deterministic 4xx fails over to the next
+/// provider without burning circuit-breaker budget on the key.
+fn map_github_model(model: &str) -> String {
+    if model.contains('/') {
+        return model.to_string();
+    }
+    let l = model.to_lowercase();
+    if l.starts_with("gpt-") || l.starts_with("o1") || l.starts_with("o3") || l.starts_with("o4") {
+        format!("openai/{}", model)
+    } else {
+        model.to_string()
+    }
+}
+
 fn provider_url(provider: &str) -> &'static str {
     match provider {
         "Groq" => "https://api.groq.com/openai/v1/chat/completions",
@@ -108,12 +153,19 @@ fn provider_url(provider: &str) -> &'static str {
         "Cohere" => "https://api.cohere.ai/v1",
         "Cerebras" => "https://api.cerebras.ai/v1",
         "Sambanova" => "https://api.sambanova.ai/v1",
-        "Github" => "https://models.inference.ai.azure.com",
+        // GitHub Models moved off the legacy Azure host (models.inference.ai.azure.com).
+        "Github" => "https://models.github.ai/inference",
         "Cloudflare" => "https://api.cloudflare.com/client/v4/accounts/default/ai/v1",
         "Nvidia" => "https://integrate.api.nvidia.com/v1",
         "OpencodeZen" => "https://opencode.ai/zen/v1",
         "Lumos" => "https://api.lumosel.vip/v1/messages",
         "TokenRouter" => "https://api.tokenrouter.com/v1/chat/completions",
+        "Zai" => "https://api.z.ai/api/paas/v4",
+        "ModelScope" => "https://api-inference.modelscope.cn/v1",
+        "SiliconFlow" => "https://api.siliconflow.com/v1",
+        "Requesty" => "https://router.requesty.ai/v1",
+        "Chutes" => "https://llm.chutes.ai/v1",
+        "OllamaCloud" => "https://ollama.com/v1",
         _ => "https://api.openai.com/v1/chat/completions",
     }
 }
@@ -125,7 +177,31 @@ fn provider_url(provider: &str) -> &'static str {
 const KNOWN_PROVIDERS: &[&str] = &[
     "OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek",
     "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github",
-    "Nvidia", "OpencodeZen", "Lumos", "TokenRouter",
+    "Nvidia", "OpencodeZen", "Lumos", "TokenRouter", "Zai", "ModelScope",
+    "SiliconFlow", "Requesty", "Chutes", "OllamaCloud",
+];
+
+/// Every provider the router will sweep through when no routing rules are set.
+/// Kept in one place so handle_chat and get_raw_stream can never drift apart —
+/// a provider missing from one of those lists is silently unreachable.
+const ALL_PROVIDERS: &[&str] = KNOWN_PROVIDERS;
+
+/// Fields Google's OpenAI-compatibility layer rejects outright with HTTP 400
+/// ("Invalid JSON payload received. Unknown name ..."), plus the penalties that
+/// Gemini 2.5+ models reject with INVALID_ARGUMENT ("Penalty is not enabled for
+/// models/gemini-2.5-*"). Google returns these error bodies gzip-encoded, which
+/// is why they often surfaced as opaque "400 (no body)" routing failures.
+const GEMINI_UNSUPPORTED_FIELDS: &[&str] = &[
+    "stream_options",
+    "frequency_penalty",
+    "presence_penalty",
+    "store",
+    "logprobs",
+    "top_logprobs",
+    "logit_bias",
+    "n",
+    "user",
+    "parallel_tool_calls",
 ];
 
 /// How the router may proceed after a failed upstream attempt.
@@ -197,6 +273,7 @@ impl ProxyRouter {
     async fn update_quota_from_headers(&self, key_id: &str, provider: &str, headers: &reqwest::header::HeaderMap) {
         let remaining_req = headers.get("x-ratelimit-remaining-requests")
             .or_else(|| headers.get("ratelimit-remaining"))
+            .or_else(|| headers.get("modelscope-ratelimit-remaining-requests"))
             .and_then(|v| v.to_str().ok())
             .and_then(|s| s.parse::<u32>().ok());
             
@@ -293,6 +370,41 @@ impl ProxyRouter {
     fn strip_null_fields(body: &mut serde_json::Value) {
         if let Some(obj) = body.as_object_mut() {
             obj.retain(|_, v| !v.is_null());
+        }
+    }
+
+    /// Drops fields Google's OpenAI-compatibility layer rejects with a 400.
+    /// MUST run after the `extra` passthrough merge, because clients (OpenClaw,
+    /// Continue, the OpenAI SDK) inject `store`, `logprobs` and friends there.
+    fn sanitize_provider_body(provider: &str, body: &mut serde_json::Value) {
+        if provider != "Gemini" {
+            return;
+        }
+        if let Some(obj) = body.as_object_mut() {
+            obj.retain(|k, _| !GEMINI_UNSUPPORTED_FIELDS.contains(&k.as_str()));
+        }
+    }
+
+    /// Same sanitization for the non-streaming path, which sends a typed
+    /// NormalizedRequest through the OpenAI adapter rather than a json! body.
+    fn sanitize_provider_request(provider: &str, req: &mut NormalizedRequest) {
+        if provider != "Gemini" {
+            return;
+        }
+        req.frequency_penalty = None;
+        req.presence_penalty = None;
+        req.extra.retain(|k, _| !GEMINI_UNSUPPORTED_FIELDS.contains(&k.as_str()));
+    }
+
+    /// Resolves the model ID a specific provider expects for this request.
+    fn effective_model_for(provider: &str, model: &str) -> String {
+        match provider {
+            "Groq" => map_groq_model(model).to_string(),
+            "TokenRouter" => map_tokenrouter_model(model).to_string(),
+            "OpencodeZen" => map_opencode_zen_model(model),
+            "Zai" => map_zai_model(model),
+            "Github" => map_github_model(model),
+            _ => model.to_string(),
         }
     }
 
@@ -397,15 +509,7 @@ impl ProxyRouter {
                 }
             }
 
-            let effective_model = if provider == "Groq" {
-                map_groq_model(&req.model).to_string()
-            } else if provider == "TokenRouter" {
-                map_tokenrouter_model(&req.model).to_string()
-            } else if provider == "OpencodeZen" {
-                map_opencode_zen_model(&req.model)
-            } else {
-                req.model.clone()
-            };
+            let effective_model = Self::effective_model_for(provider, &req.model);
             let mut effective_max_tokens = req.max_tokens;
             if provider == "Groq" {
                 if let Some(tokens) = effective_max_tokens {
@@ -437,6 +541,9 @@ impl ProxyRouter {
                     }
                 }
             }
+
+            // Runs last: clients inject provider-hostile fields via `extra`.
+            Self::sanitize_provider_body(provider, &mut stream_req);
 
             let upstream = match self.client.post(&url)
                 .header("Authorization", format!("Bearer {}", plaintext))
@@ -524,11 +631,12 @@ impl ProxyRouter {
             Ok(Sse::new(stream).into_response())
         } else {
             // Remap the implicit legacy model alias for providers with their own
-            // catalog (OpenCode Zen); explicit routing-rule models are untouched.
+            // catalog (Zen, Z.ai, GitHub Models); explicit routing-rule models
+            // pass through effective_model_for untouched.
             let mut effective_req = req.clone();
-            if provider == "OpencodeZen" {
-                effective_req.model = map_opencode_zen_model(&req.model);
-            }
+            effective_req.model = Self::effective_model_for(provider, &req.model);
+            // Strip fields Gemini's compatibility layer rejects with a 400.
+            Self::sanitize_provider_request(provider, &mut effective_req);
             let result = match provider {
                 "Groq" => self.groq.chat(&self.client, &effective_req, &plaintext).await,
                 "Anthropic" | "Lumos" => self.anthropic.chat_custom(&self.client, &effective_req, &plaintext, provider_url(provider)).await,
@@ -653,9 +761,8 @@ impl ProxyRouter {
             custom_rules.iter().map(|r| (r.provider.clone(), r.model.clone())).collect()
         } else {
             let primary = model_to_provider(&req.model);
-            let all = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos", "TokenRouter"];
             let mut list = vec![(primary.to_string(), req.model.clone())];
-            for &p in &all {
+            for &p in ALL_PROVIDERS {
                 if p != primary {
                     list.push((p.to_string(), req.model.clone()));
                 }
@@ -709,15 +816,7 @@ impl ProxyRouter {
                     format!("{}/chat/completions", base_url)
                 };
 
-                let effective_model = if provider == "Groq" {
-                    map_groq_model(model).to_string()
-                } else if provider == "TokenRouter" {
-                    map_tokenrouter_model(model).to_string()
-                } else if provider == "OpencodeZen" {
-                    map_opencode_zen_model(model)
-                } else {
-                    model.clone()
-                };
+                let effective_model = Self::effective_model_for(provider, model);
 
                 let stream_req = if provider == "Anthropic" || provider == "Lumos" {
                     // Use the model from routing rules, not the original request model
@@ -752,24 +851,20 @@ impl ProxyRouter {
                             }
                         }
                     }
+
+                    // Runs last: Claude Code and other clients inject fields
+                    // (store, logprobs, ...) that Gemini rejects with a 400.
+                    Self::sanitize_provider_body(provider, &mut req_val);
                     req_val
                 };
 
                 let mut req_builder = self.client.post(&url);
                 if provider == "Anthropic" || provider == "Lumos" {
-                    if url.contains("lumosel.vip") {
-                        req_builder = req_builder
-                            .header("x-api-key", &plaintext)
-                            .header("anthropic-version", "2023-06-01")
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                            .header("Content-Type", "application/json");
-                    } else {
-                        req_builder = req_builder
-                            .header("x-api-key", &plaintext)
-                            .header("anthropic-version", "2023-06-01")
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                            .header("Content-Type", "application/json");
-                    }
+                    req_builder = req_builder
+                        .header("x-api-key", &plaintext)
+                        .header("anthropic-version", "2023-06-01")
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                        .header("Content-Type", "application/json");
                 } else {
                     req_builder = req_builder
                         .header("Authorization", format!("Bearer {}", plaintext))
@@ -797,6 +892,15 @@ impl ProxyRouter {
                 let status = upstream.status().as_u16();
                 if status == 401 || status == 429 || !upstream.status().is_success() {
                     let detail = Self::upstream_error_detail(upstream, format!("HTTP {}", status)).await;
+                    if status == 401 {
+                        // Unify 401 handling with try_key: mark the key invalid and
+                        // trip the breaker so a dead key stops being retried.
+                        self.vault.vault.lock().await.set_key_validity(&key_entry.id, false);
+                        self.circuit_breaker.trip(&key_entry.id, Duration::from_secs(300)).await;
+                        self.emit_event(RoutingEvent { id: Uuid::new_v4().to_string(), timestamp: now_secs(), provider: provider.to_string(), latency_ms: start.elapsed().as_millis() as u64, tokens_used: 0, success: false, error_msg: Some(detail.clone()) });
+                        failures.push(format!("{}:{} — {}", provider, model, detail));
+                        continue;
+                    }
                     if is_deterministic_4xx(status) {
                         // The request shape itself was rejected: skip the remaining
                         // keys for this provider (every key fails identically) but
@@ -876,8 +980,7 @@ impl ProxyRouter {
             }
 
             // Fallback: try all other providers that have keys
-            let all_providers = ["OpenAI", "Groq", "Gemini", "Anthropic", "Mistral", "xAI", "DeepSeek", "OpenRouter", "Cohere", "Cerebras", "Sambanova", "Cloudflare", "Github", "Nvidia", "OpencodeZen", "Lumos", "TokenRouter"];
-            for &provider in &all_providers {
+            for &provider in ALL_PROVIDERS {
                 if provider == primary_provider {
                     continue;
                 }
@@ -935,15 +1038,7 @@ impl ProxyRouter {
                     };
                 }
 
-                let env_model = if primary_provider == "Groq" {
-                    map_groq_model(&req.model).to_string()
-                } else if primary_provider == "TokenRouter" {
-                    map_tokenrouter_model(&req.model).to_string()
-                } else if primary_provider == "OpencodeZen" {
-                    map_opencode_zen_model(&req.model)
-                } else {
-                    req.model.clone()
-                };
+                let env_model = Self::effective_model_for(primary_provider, &req.model);
                 let mut effective_max_tokens = req.max_tokens;
                 if primary_provider == "Groq" {
                     if let Some(tokens) = effective_max_tokens {
@@ -974,6 +1069,10 @@ impl ProxyRouter {
                         }
                     }
                 }
+
+                // Runs last: strip fields Gemini rejects with a 400.
+                Self::sanitize_provider_body(primary_provider, &mut stream_req);
+
                 return match router.client.post(&url)
                     .header("Authorization", format!("Bearer {}", env_key))
                     .header("Content-Type", "application/json")
@@ -994,10 +1093,13 @@ impl ProxyRouter {
                     Err(e) => (StatusCode::BAD_GATEWAY, Json(json!({"error": format!("Upstream failed: {}", e)}))).into_response()
                 };
             } else {
+                let mut env_req = req.clone();
+                env_req.model = Self::effective_model_for(primary_provider, &req.model);
+                Self::sanitize_provider_request(primary_provider, &mut env_req);
                 let result = match primary_provider {
-                    "Groq" => router.groq.chat(&router.client, &req, &env_key).await,
-                    "Anthropic" => router.anthropic.chat(&router.client, &req, &env_key).await,
-                    _ => router.openai.chat_custom(&router.client, &req, &env_key, &url).await,
+                    "Groq" => router.groq.chat(&router.client, &env_req, &env_key).await,
+                    "Anthropic" => router.anthropic.chat(&router.client, &env_req, &env_key).await,
+                    _ => router.openai.chat_custom(&router.client, &env_req, &env_key, &url).await,
                 };
                 return match result {
                     Ok(resp) => {
@@ -1056,6 +1158,8 @@ impl ProxyRouter {
                 {"id": "llama-3.1-8b-instant", "object": "model", "owned_by": "groq"},
                 {"id": "mixtral-8x7b-32768", "object": "model", "owned_by": "groq"},
                 {"id": "gemma2-9b-it", "object": "model", "owned_by": "groq"},
+                {"id": "glm-4.7-flash", "object": "model", "owned_by": "zai"},
+                {"id": "glm-4.5-flash", "object": "model", "owned_by": "zai"},
             ]
         });
         ([("Content-Type", "application/json")], models.to_string())
