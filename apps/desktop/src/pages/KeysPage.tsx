@@ -32,7 +32,7 @@ export default function KeysPage() {
   const [showGuide, setShowGuide] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
-  const providers = ['OpenAI', 'Groq', 'Gemini', 'Mistral', 'Anthropic', 'xAI', 'DeepSeek', 'OpenRouter', 'Cohere', 'Cerebras', 'Sambanova', 'Cloudflare', 'Github', 'Nvidia', 'OpencodeZen', 'Lumos', 'TokenRouter']
+  const providers = ['OpenAI', 'Groq', 'Gemini', 'Mistral', 'Anthropic', 'xAI', 'DeepSeek', 'OpenRouter', 'Cohere', 'Cerebras', 'Sambanova', 'Cloudflare', 'Github', 'Nvidia', 'OpencodeZen', 'Lumos', 'TokenRouter', 'Zai', 'ModelScope', 'SiliconFlow', 'Requesty', 'Chutes', 'OllamaCloud']
 
   const loadKeys = async () => {
     try {

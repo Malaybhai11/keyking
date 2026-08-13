@@ -72,6 +72,51 @@ async fn check_key(provider: &str, key: &str) -> Result<bool, String> {
                 .send().await.map_err(|e| e.to_string())?;
             Ok(resp.status().is_success())
         }
+        "Zai" => {
+            let resp = client.get("https://api.z.ai/api/paas/v4/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "ModelScope" => {
+            let resp = client.get("https://api-inference.modelscope.cn/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "SiliconFlow" => {
+            let resp = client.get("https://api.siliconflow.com/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "Requesty" => {
+            let resp = client.get("https://router.requesty.ai/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "Chutes" => {
+            let resp = client.get("https://llm.chutes.ai/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "OllamaCloud" => {
+            let resp = client.get("https://ollama.com/v1/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
+        "Github" => {
+            // GitHub Models now serves its catalog from models.github.ai; a
+            // classic PAT authenticates with no extra scopes.
+            let resp = client.get("https://models.github.ai/catalog/models")
+                .header("Authorization", format!("Bearer {}", key))
+                .header("Accept", "application/vnd.github+json")
+                .send().await.map_err(|e| e.to_string())?;
+            Ok(resp.status().is_success())
+        }
         _ => Ok(true)
     }
 }
@@ -151,11 +196,15 @@ fn static_catalog(provider: &str) -> Vec<&'static str> {
             "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
             "@cf/qwen/qwen1.5-14b-chat-awq",
         ],
+        // models.github.ai requires publisher-prefixed IDs, unlike the legacy
+        // Azure host which accepted bare names like "gpt-4o".
         "Github" => vec![
-            "gpt-4o",
-            "gpt-4o-mini",
-            "Phi-3.5-mini-instruct",
-            "Llama-3.3-70B-Instruct",
+            "openai/gpt-4o",
+            "openai/gpt-4o-mini",
+            "openai/gpt-4.1",
+            "openai/gpt-4.1-mini",
+            "microsoft/Phi-3.5-mini-instruct",
+            "meta/Llama-3.3-70B-Instruct",
         ],
         "Lumos" => vec![
             "claude-opus-4-8",
@@ -169,6 +218,34 @@ fn static_catalog(provider: &str) -> Vec<&'static str> {
         "TokenRouter" => vec![
             "moonshotai/kimi-k3-free",
             "kimi-k3-free",
+        ],
+        // GLM Flash models are permanently free on Z.ai.
+        "Zai" => vec![
+            "glm-4.7-flash",
+            "glm-4.5-flash",
+            "glm-4.6",
+            "glm-4.7",
+            "glm-5.2",
+        ],
+        "ModelScope" => vec![
+            "Qwen/Qwen3-32B",
+            "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+            "deepseek-ai/DeepSeek-V3.2-Exp",
+            "ZhipuAI/GLM-4.5",
+        ],
+        "SiliconFlow" => vec![
+            "Qwen/Qwen3-8B",
+            "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+            "THUDM/glm-4-9b-chat",
+        ],
+        "Chutes" => vec![
+            "deepseek-ai/DeepSeek-V3-0324",
+            "deepseek-ai/DeepSeek-R1",
+        ],
+        "OllamaCloud" => vec![
+            "gpt-oss:120b",
+            "deepseek-v3.1:671b",
+            "qwen3-coder:480b",
         ],
         _ => vec![],
     }
@@ -200,8 +277,8 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
         // Live catalog endpoints. Previously Anthropic, Cerebras, Sambanova,
         // Cloudflare, Github, Lumos and TokenRouter were hardcoded static lists
         // that went stale as providers rotated their catalogs; now every
-        // provider with a models endpoint is fetched live and the static list
-        // is only a fallback.
+        // provider with an OpenAI-shaped models endpoint is fetched live and the
+        // static list is only a fallback.
         let url = match provider.as_str() {
             "OpenAI" => Some("https://api.openai.com/v1/models"),
             "Groq" => Some("https://api.groq.com/openai/v1/models"),
@@ -217,6 +294,15 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             "Anthropic" => Some("https://api.anthropic.com/v1/models"),
             "Cerebras" => Some("https://api.cerebras.ai/v1/models"),
             "Sambanova" => Some("https://api.sambanova.ai/v1/models"),
+            "Zai" => Some("https://api.z.ai/api/paas/v4/models"),
+            "ModelScope" => Some("https://api-inference.modelscope.cn/v1/models"),
+            "SiliconFlow" => Some("https://api.siliconflow.com/v1/models"),
+            "Requesty" => Some("https://router.requesty.ai/v1/models"),
+            "Chutes" => Some("https://llm.chutes.ai/v1/models"),
+            "OllamaCloud" => Some("https://ollama.com/v1/models"),
+            // Github's catalog endpoint returns a bare JSON array rather than
+            // the OpenAI {"data": [...]} envelope, so it stays on the static
+            // list until a dedicated parser is added.
             _ => None,
         };
 
@@ -272,7 +358,7 @@ pub async fn get_available_models(state: tauri::State<'_, SharedVault>) -> Resul
             };
             futures.push(fut);
         } else {
-            // No live catalog endpoint (Cloudflare, Github) — static list only.
+            // No usable live catalog endpoint (Cloudflare, Github) — static only.
             for id in static_catalog(&provider) {
                 all_models.push(ModelInfo { id: id.to_string(), provider: provider.clone() });
             }
@@ -418,6 +504,13 @@ pub async fn export_vault(
     // Generate 12-byte random nonce
     let mut nonce_bytes = [0u8; 12];
     OsRng.fill_bytes(&mut nonce_bytes);
+
+    // Encrypt the payload with AES-256-GCM (ciphertext includes the auth tag).
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&derived_key));
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(nonce, json_payload.as_bytes())
+        .map_err(|e| format!("Vault encryption failed: {}", e))?;
 
     // Wire format: salt[32] + nonce[12] + ciphertext_with_tag
     let mut wire = Vec::with_capacity(32 + 12 + ciphertext.len());

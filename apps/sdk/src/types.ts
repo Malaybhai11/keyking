@@ -26,7 +26,13 @@ export type Provider =
   | "Nvidia"
   | "OpencodeZen"
   | "Lumos"
-  | "TokenRouter";
+  | "TokenRouter"
+  | "Zai"
+  | "ModelScope"
+  | "SiliconFlow"
+  | "Requesty"
+  | "Chutes"
+  | "OllamaCloud";
 
 /** Provider endpoint configuration. */
 export interface ProviderConfig {
