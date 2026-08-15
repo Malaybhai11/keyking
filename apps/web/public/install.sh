@@ -553,6 +553,85 @@ claude --settings '{"env":{"CLAUDE_CODE_USE_BEDROCK":"0","CLAUDE_CODE_USE_VERTEX
 EOF
     cp "$TMP_DIR/keyking-claude.ps1" "$CLAUDE_WRAPPER_PS1"
 
+    # Create Codex wrapper (Bash for Git Bash)
+    CODEX_WRAPPER_BASH="${WIN_BIN_DIR}/keyking-codex"
+    cat << 'EOF' > "$TMP_DIR/keyking-codex"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v codex >/dev/null 2>&1; then
+    echo "Codex CLI not found. Install it first: npm install -g @openai/codex" >&2
+    exit 1
+fi
+
+export KEYKING_CODEX_API_KEY="${KEYKING_CODEX_API_KEY:-kk-zero-config}"
+KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+
+if ! curl -fsS --max-time 2 "${KEYKING_CODEX_BASE_URL}/models" >/dev/null 2>&1; then
+    echo "[KeyKing] Proxy is not reachable at ${KEYKING_CODEX_BASE_URL}. Open KeyKing first." >&2
+    exit 1
+fi
+
+echo "👑 Routing Codex through KeyKing..."
+exec codex \
+    -c 'model="gpt-4o"' \
+    -c 'model_provider="keyking"' \
+    -c "model_providers.keyking={name=\"KeyKing\",base_url=\"${KEYKING_CODEX_BASE_URL}\",env_key=\"KEYKING_CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false,supports_websockets=false}" \
+    "$@"
+EOF
+    cp "$TMP_DIR/keyking-codex" "$CODEX_WRAPPER_BASH"
+    chmod +x "$CODEX_WRAPPER_BASH"
+
+    # Create Codex wrapper (CMD for command prompt)
+    CODEX_WRAPPER_CMD="${WIN_BIN_DIR}/keyking-codex.cmd"
+    cat << 'EOF' > "$TMP_DIR/keyking-codex.cmd"
+@echo off
+setlocal
+
+where codex >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo Codex CLI not found. Install it first: npm install -g @openai/codex
+    exit /b 1
+)
+
+if "%KEYKING_CODEX_API_KEY%"=="" set KEYKING_CODEX_API_KEY=kk-zero-config
+if "%KEYKING_CODEX_BASE_URL%"=="" set KEYKING_CODEX_BASE_URL=http://127.0.0.1:8787/v1
+
+echo [KeyKing] Routing Codex through KeyKing...
+codex -c "model='gpt-4o'" -c "model_provider='keyking'" -c "model_providers.keyking={name='KeyKing',base_url='%KEYKING_CODEX_BASE_URL%',env_key='KEYKING_CODEX_API_KEY',wire_api='responses',requires_openai_auth=false,supports_websockets=false}" %*
+set EXIT_CODE=%ERRORLEVEL%
+endlocal & exit /b %EXIT_CODE%
+EOF
+    cp "$TMP_DIR/keyking-codex.cmd" "$CODEX_WRAPPER_CMD"
+
+    # Create Codex wrapper (PS1 for PowerShell)
+    CODEX_WRAPPER_PS1="${WIN_BIN_DIR}/keyking-codex.ps1"
+    cat << 'EOF' > "$TMP_DIR/keyking-codex.ps1"
+$ErrorActionPreference = "Stop"
+
+if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+    Write-Error "Codex CLI not found. Install it first: npm install -g @openai/codex"
+    exit 1
+}
+
+if (-not $env:KEYKING_CODEX_API_KEY) {
+    $env:KEYKING_CODEX_API_KEY = "kk-zero-config"
+}
+if (-not $env:KEYKING_CODEX_BASE_URL) {
+    $env:KEYKING_CODEX_BASE_URL = "http://127.0.0.1:8787/v1"
+}
+
+$providerOverride = "model_providers.keyking={name='KeyKing',base_url='$env:KEYKING_CODEX_BASE_URL',env_key='KEYKING_CODEX_API_KEY',wire_api='responses',requires_openai_auth=false,supports_websockets=false}"
+Write-Host "👑 Routing Codex through KeyKing..."
+& codex `
+    -c "model='gpt-4o'" `
+    -c "model_provider='keyking'" `
+    -c $providerOverride `
+    @args
+exit $LASTEXITCODE
+EOF
+    cp "$TMP_DIR/keyking-codex.ps1" "$CODEX_WRAPPER_PS1"
+
     (sleep 0.5) &
     spinner "Copying binary and creating Claude wrappers in ${BR_YELLOW}${WIN_BIN_DIR}${RESET}" $!
 
@@ -604,6 +683,38 @@ EOF
         sudo mv "$TMP_DIR/keyking-claude" "$CLAUDE_WRAPPER"
     fi
     chmod +x "$CLAUDE_WRAPPER"
+
+    CODEX_WRAPPER="${INSTALL_DIR}/keyking-codex"
+    cat << 'EOF' > "$TMP_DIR/keyking-codex"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v codex >/dev/null 2>&1; then
+    echo "Codex CLI not found. Install it first: npm install -g @openai/codex" >&2
+    exit 1
+fi
+
+export KEYKING_CODEX_API_KEY="${KEYKING_CODEX_API_KEY:-kk-zero-config}"
+KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+
+if ! curl -fsS --max-time 2 "${KEYKING_CODEX_BASE_URL}/models" >/dev/null 2>&1; then
+    echo "[KeyKing] Proxy is not reachable at ${KEYKING_CODEX_BASE_URL}. Open KeyKing first." >&2
+    exit 1
+fi
+
+echo "👑 Routing Codex through KeyKing..."
+exec codex \
+    -c 'model="gpt-4o"' \
+    -c 'model_provider="keyking"' \
+    -c "model_providers.keyking={name=\"KeyKing\",base_url=\"${KEYKING_CODEX_BASE_URL}\",env_key=\"KEYKING_CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false,supports_websockets=false}" \
+    "$@"
+EOF
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$TMP_DIR/keyking-codex" "$CODEX_WRAPPER"
+    else
+        sudo mv "$TMP_DIR/keyking-codex" "$CODEX_WRAPPER"
+    fi
+    chmod +x "$CODEX_WRAPPER"
 fi
 
 (sleep 0.2) &
@@ -684,9 +795,11 @@ echo -e "  ${BR_YELLOW}  # Route requests through KeyKing${RESET}"
 echo -e "    ${BR_YELLOW}\$ curl http://localhost:8787/v1/chat/completions \\${RESET}
     ${BR_YELLOW}    -H 'Content-Type: application/json' \\${RESET}
     ${BR_YELLOW}    -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello!"}]}'${RESET}
-
   ${BR_YELLOW}  # Use Claude Code with Zero-Config through KeyKing${RESET}
-    ${BR_YELLOW}$ keyking-claude${RESET}"
+    ${BR_YELLOW}$ keyking-claude${RESET}
+    
+  ${BR_YELLOW}  # Use OpenAI Codex with Zero-Config through KeyKing${RESET}
+    ${BR_YELLOW}$ keyking-codex${RESET}"
 echo ""
 
 hr
