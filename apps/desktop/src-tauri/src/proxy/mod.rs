@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod router;
 pub mod anthropic;
+pub mod responses;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingEvent {
