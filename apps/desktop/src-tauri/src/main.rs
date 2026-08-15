@@ -68,6 +68,7 @@ async fn start_proxy(handle: tauri::AppHandle, vault_state: Arc<VaultState>, sys
     let app = Router::new()
         .route("/v1/chat/completions", axum::routing::post(ProxyRouter::handle_chat))
         .route("/v1/messages", axum::routing::post(crate::proxy::anthropic::handle_anthropic_messages))
+        .route("/v1/responses", axum::routing::post(crate::proxy::responses::handle_responses))
         .route("/v1/models", axum::routing::get(ProxyRouter::handle_models))
         .route("/auth/callback", axum::routing::get(handle_auth_callback))
         .with_state(router);

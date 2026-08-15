@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v codex >/dev/null 2>&1; then
+    echo "Codex CLI not found. Install it first: npm install -g @openai/codex" >&2
+    exit 1
+fi
+
+export KEYKING_CODEX_API_KEY="${KEYKING_CODEX_API_KEY:-kk-zero-config}"
+KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+
+if ! curl -fsS --max-time 2 "${KEYKING_CODEX_BASE_URL}/models" >/dev/null 2>&1; then
+    echo "[KeyKing] Proxy is not reachable at ${KEYKING_CODEX_BASE_URL}. Open KeyKing first." >&2
+    exit 1
+fi
+
+echo "👑 Routing Codex through KeyKing..."
+exec codex \
+    -c 'model="gpt-4o"' \
+    -c 'model_provider="keyking"' \
+    -c "model_providers.keyking={name=\"KeyKing\",base_url=\"${KEYKING_CODEX_BASE_URL}\",env_key=\"KEYKING_CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false,supports_websockets=false}" \
+    "$@"
