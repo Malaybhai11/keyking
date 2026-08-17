@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Lexend } from "next/font/google";
 import "./globals.css";
 
+const siteUrl = "https://keyking.ledgion.in";
+
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
@@ -15,24 +17,55 @@ const lexend = Lexend({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://keyking.ledgion.in'),
-  title: "KeyKing | Free Claude Code & Free AI API Aggregator",
-  description: "KeyKing is the ultimate Zero-Trust LLM API aggregator. Manage API Keys locally, run Free Claude Code, pool your free tiers, and bypass rate limits with zero limits. Get 1.7 Billion free LLM tokens with KeyKing today.",
-  keywords: ["KeyKing", "Free Claude Code", "Free AI API", "Zero-Trust LLM API", "Manage API Keys", "AI aggregator", "vibe coding", "bypass rate limits"],
-  alternates: {
-    canonical: '/',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "KeyKing AI — Local AI API Key Manager & Gateway",
+    template: "%s | KeyKing AI",
   },
+  description:
+    "KeyKing AI is the local AI gateway for developers. Store AI provider keys in an encrypted local vault, use one OpenAI-compatible endpoint, and automatically fail over across providers.",
+  applicationName: "KeyKing AI",
+  authors: [{ name: "Ledgion", url: "https://ledgion.in" }],
+  creator: "Ledgion",
+  publisher: "Ledgion",
+  category: "Developer Tools",
+  keywords: [
+    "KeyKing AI",
+    "local AI gateway",
+    "AI API key manager",
+    "AI API key vault",
+    "OpenAI compatible gateway",
+    "LLM provider fallback",
+    "multi provider AI gateway",
+    "BYOK AI gateway",
+    "Claude Code gateway",
+    "secure AI API key storage",
+  ],
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "KeyKing | Run Claude Code for Free & Manage API Keys",
-    description: "Get Free AI API access, manage API keys securely with Zero-Trust encryption, and run Claude Code without limits. KeyKing aggregates LLM free tiers to give you unlimited tokens.",
+    title: "KeyKing AI — Your Local AI Gateway",
+    description:
+      "Keep AI API keys encrypted on your machine, call one OpenAI-compatible endpoint, and fail over between providers automatically.",
     type: "website",
-    url: "https://keyking.ledgion.in",
-    siteName: "KeyKing Ecosystem",
+    url: siteUrl,
+    siteName: "KeyKing AI",
+    locale: "en_US",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "KeyKing AI local gateway and encrypted API key vault",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "KeyKing | Zero-Trust AI API Load Balancer",
-    description: "Implement multi-provider redundancy and local failover routing. Manage your API keys locally with zero trust. Ensure 100% uptime for your AI apps.",
+    title: "KeyKing AI — Local AI API Key Manager & Gateway",
+    description:
+      "Your AI keys. One local endpoint. Automatic provider fallback.",
+    creator: "@MalayRaval11",
+    images: ["/opengraph-image.png"],
   },
   robots: {
     index: true,
@@ -40,66 +73,70 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
-  verification: {
-    google: "e-keyking-verification-id", // Placeholder for actual GSC tag
-  }
 };
 
 import { PHProvider } from "./providers";
 import PostHogPageView from "./PostHogPageView";
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "SoftwareApplication",
-        "name": "KeyKing AI Proxy",
-        "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Windows, macOS, Linux",
-        "url": "https://keyking.ledgion.in",
-        "description": "KeyKing is the ultimate Zero-Trust LLM API proxy. Manage API Keys locally, implement intelligent fallback routing, and integrate seamlessly with your CLI tools for 100% uptime.",
-        "offers": {
-          "@type": "Offer",
-          "price": "0.00",
-          "priceCurrency": "USD"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "KeyKing Ecosystem",
-          "url": "https://keyking.ledgion.in",
-          "logo": "https://keyking.ledgion.in/icon.png"
-        }
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: "Ledgion",
+        url: "https://ledgion.in",
+        sameAs: ["https://github.com/Malaybhai11"],
       },
       {
         "@type": "WebSite",
-        "url": "https://keyking.ledgion.in",
-        "name": "KeyKing Ecosystem",
-        "description": "Intelligent AI API Load Balancing and Failover Routing."
-      }
-    ]
+        "@id": `${siteUrl}/#website`,
+        url: siteUrl,
+        name: "KeyKing AI",
+        alternateName: ["KeyKing AI Gateway", "KeyKing API Key Manager"],
+        description:
+          "Official website for KeyKing AI, the local AI API key manager and multi-provider gateway for developers.",
+        publisher: { "@id": `${siteUrl}/#organization` },
+        inLanguage: "en-US",
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": `${siteUrl}/#software`,
+        name: "KeyKing AI",
+        alternateName: "KeyKing Local AI Gateway",
+        applicationCategory: "DeveloperApplication",
+        applicationSubCategory: "AI API Gateway",
+        operatingSystem: "Windows, macOS, Linux",
+        url: siteUrl,
+        downloadUrl: "https://github.com/Malaybhai11/keyking/releases/latest",
+        softwareHelp: `${siteUrl}/docs`,
+        description:
+          "A local AI gateway that stores provider API keys in an encrypted vault, exposes one OpenAI-compatible endpoint, and performs automatic multi-provider fallback.",
+        featureList: [
+          "Encrypted local AI API key vault",
+          "OpenAI-compatible local endpoint",
+          "Automatic provider and model fallback",
+          "Priority Ladder routing",
+          "Claude Code and Codex compatibility",
+          "Serverless TypeScript SDK",
+        ],
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        author: { "@id": `${siteUrl}/#organization` },
+        sameAs: ["https://github.com/Malaybhai11/keyking"],
+      },
+    ],
   };
 
   return (
-    <html
-      lang="en"
-      className={`${spaceGrotesk.variable} ${lexend.variable} h-full antialiased`}
-      suppressHydrationWarning
-    >
+    <html lang="en" className={`${spaceGrotesk.variable} ${lexend.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <PHProvider>
         <body className="min-h-full flex flex-col font-body bg-neo-bg text-black overflow-x-hidden" suppressHydrationWarning>

@@ -1,121 +1,118 @@
 <div align="center">
-  <img src="apps/web/public/finalKK.png" alt="KeyKing Logo" width="180" />
+  <img src="apps/web/public/finalKK.png" alt="KeyKing AI logo" width="160" />
 
-  # 👑 KeyKing
+# KeyKing AI
 
-  **The Ultimate Zero-Trust API Key Management Ecosystem**
+**The local AI gateway that securely manages your AI API keys.**
 
-  [![Rust](https://img.shields.io/badge/Rust-Tauri-orange?style=for-the-badge&logo=rust)](https://tauri.app/)
-  [![Node.js](https://img.shields.io/badge/Node.js-SDK-green?style=for-the-badge&logo=nodedotjs)](https://nodejs.org)
-  [![Next.js](https://img.shields.io/badge/Next.js-Demo-black?style=for-the-badge&logo=nextdotjs)](https://nextjs.org/)
-  [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+Store provider keys in an encrypted local vault. Use one OpenAI-compatible endpoint. Automatically fail over between providers and models.
 
-  > Bring absolute security to your API keys. No central servers. Complete control. Decrypted on the fly.
+[Website](https://keyking.ledgion.in) · [Documentation](https://keyking.ledgion.in/docs) · [Download](https://github.com/Malaybhai11/keyking/releases/latest) · [Security model](https://keyking.ledgion.in/security)
 </div>
 
-<br />
+## Why KeyKing AI?
 
-<div align="center">
-  <img src="apps/web/src/app/opengraph-image.png" alt="KeyKing Banner" width="100%" style="border-radius: 12px; box-shadow: 0 4px 14px 0 rgba(0,0,0,0.2);" />
-</div>
+- **Local key custody** — provider credentials are encrypted on your machine.
+- **One endpoint** — connect OpenAI-compatible apps to `http://127.0.0.1:8787/v1`.
+- **Priority fallback** — order explicit provider/model pairs and fail over after eligible errors.
+- **Coding-agent workflows** — adapters and wrappers for Claude Code and OpenAI Codex.
+- **Multiple providers** — route user-supplied credentials for OpenAI, Anthropic, Groq, Gemini, Mistral, and others.
+- **Serverless option** — use the TypeScript `keyking-sdk` with an exported encrypted vault.
 
-<br />
+> KeyKing AI is a gateway, not an LLM provider. It does not create unlimited third-party tokens. You bring the credentials and quotas you are authorized to use.
 
-## 🌟 The Ecosystem
+## Install the desktop gateway
 
-We haven't just built a tool; we've built an **entire ecosystem** to secure your developer experience from local vibe-coding to production serverless deployments. Every product is tied together with a **fully new, modern UI**.
+macOS / Linux:
 
-| Product | Technology Stack | Purpose |
-| :--- | :--- | :--- |
-| **Desktop Control Plane** | `Tauri` + `Rust` + `React` | A beautifully designed, native desktop app to securely manage and encrypt your keys locally. Features a stunning modern UI where your keys never leave your machine unencrypted. |
-| **Zero-Trust Serverless SDK** | `Node.js` + `TypeScript` | A lightweight, edge-compatible SDK that decrypts your secure vaults on the fly at runtime, completely eliminating `.env` file leaks. |
-| **Live Next.js Demo Chatbot** | `Next.js` + `AI` | A production-ready AI chatbot demonstrating how to use KeyKing safely in a modern web application without exposing LLM keys. |
-| **Developer Website** | `Next.js` + `TailwindCSS` | Comprehensive documentation, landing page, and developer resources to get you started on your secure journey. |
+```bash
+curl -fsSL https://keyking.ledgion.in/install.sh | bash
+```
 
----
+Windows and packaged desktop releases:
 
-## 💡 Top 3 Use Cases
+```text
+https://github.com/Malaybhai11/keyking/releases/latest
+```
 
-### 1. 🎸 Local Vibe-Coding
-Stop worrying about accidentally pushing `.env` files to GitHub or exposing your API keys during live streams. With KeyKing, you run your dev server using `keyking dev`. Your keys are securely served locally via IPC and injected into the process only when your code actually runs.
+Start the local proxy, then point an OpenAI-compatible client at KeyKing:
 
-### 2. 🚀 Production Serverless
-In a serverless environment (Vercel, AWS Lambda, Cloudflare Workers), securely distribute a fully encrypted vault file. Use our Node.js SDK to decrypt the vault on-the-fly at the edge using a single master password environment variable.
+```ts
+import OpenAI from "openai";
 
-### 3. 🔐 Vault Export & Backup
-Easily export your entire key collection as a fully encrypted vault file. Back it up on Google Drive, share it with your team, or store it right in your git repository—it's mathematically secure against offline attacks.
+const client = new OpenAI({
+  baseURL: "http://127.0.0.1:8787/v1",
+  apiKey: "your-local-keyking-token",
+});
 
----
+const response = await client.chat.completions.create({
+  model: "gpt-4o",
+  messages: [{ role: "user", content: "Hello from KeyKing AI" }],
+});
+```
 
-## 🏗️ Architecture: Uncompromising Zero-Trust
+## Priority Ladder
 
-We designed KeyKing from the ground up so that **even we cannot read your keys.** 
+The Priority Ladder is KeyKing's ordered fallback chain. Use explicit provider/model pairs:
 
-KeyKing relies on industry-standard, battle-tested cryptographic primitives to ensure your secrets are safe both at rest and in transit.
+```ts
+import { KeyKing } from "keyking-sdk";
 
-- **AES-256-GCM**: Advanced Encryption Standard with 256-bit keys in Galois/Counter Mode. This provides both confidentiality (strong encryption) and authenticity (tamper-proofing).
-- **PBKDF2**: Password-Based Key Derivation Function 2 with a high iteration count. It turns your master password into an extremely strong cryptographic key, resisting brute-force attacks.
+const keyking = new KeyKing({
+  vault: process.env.KEYKING_VAULT,
+  password: process.env.KEYKING_PASSWORD,
+  routingRules: [
+    { provider: "Groq", model: "llama-3.3-70b-versatile" },
+    { provider: "Anthropic", model: "claude-3-5-sonnet-20241022" },
+    { provider: "OpenAI", model: "gpt-4o" },
+  ],
+});
+```
+
+When the active route hits an eligible rate limit or upstream failure, KeyKing tries the next configured route.
+
+## Architecture
 
 ```mermaid
-graph TD
-    A[Master Password] -->|PBKDF2| B(Cryptographic Key)
-    C[Raw API Keys] -->|AES-256-GCM| D{Encrypted Vault}
-    B --> D
-    D -->|Stored safely at rest| E[(File System / Git Repo)]
-    E -->|Deployed to| F[Serverless Edge]
-    F -->|Decrypted with Key| G[Usable API Keys in Memory]
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style G fill:#bbf,stroke:#333,stroke-width:2px
+flowchart LR
+  A[Claude Code / Codex / App] --> B[KeyKing local proxy]
+  V[Encrypted local vault] --> B
+  B --> C{Priority Ladder}
+  C --> D[OpenAI]
+  C --> E[Anthropic]
+  C --> F[Groq / Gemini / Mistral]
 ```
 
-> **How it works:**
-> 1. **At Rest:** Your keys are encrypted locally inside the Desktop App using **AES-256-GCM** before being saved to a vault.
-> 2. **In Motion:** The encrypted vault can be safely version-controlled or deployed directly with your source code.
-> 3. **In Memory:** Our Serverless SDK derives your decryption key via **PBKDF2** and decrypts your vault *only* at the edge, strictly keeping the raw keys in memory.
+- Desktop: Tauri + Rust + React
+- Local proxy: Axum + Tokio
+- Vault encryption: AES-256-GCM
+- Password derivation: PBKDF2-HMAC-SHA256
+- Web and docs: Next.js
+- Serverless package: `keyking-sdk`
 
----
+## Compatibility routes
 
-## ⚡ Quick Start
+| Interface | Local route |
+|---|---|
+| OpenAI Chat Completions | `/v1/chat/completions` |
+| OpenAI Responses / Codex | `/v1/responses` |
+| Anthropic Messages / Claude Code | `/v1/messages` |
 
-### 1. The Local Developer Experience (CLI)
+## Security boundaries
 
-Start your development server securely using the KeyKing CLI. It automatically resolves and injects your secrets securely in your local environment.
+Provider credentials are encrypted at rest in the local vault and decrypted when required to call the selected upstream provider. The selected provider necessarily receives the prompt and authentication credential required to serve the request. KeyKing cannot protect a compromised host from malware or an attacker with sufficient local access.
 
-```bash
-# Securely inject keys and start your Next.js dev server
-keyking dev -- npm run dev
+Read the [full security explanation](https://keyking.ledgion.in/security) and repository [security checklist](SECURITY.md).
 
-# Or for a Python script
-keyking dev -- python main.py
-```
+## Documentation
 
-### 2. The Serverless SDK (Production)
+- [AI API key manager overview](https://keyking.ledgion.in/ai-api-key-manager)
+- [Use Claude Code with KeyKing AI](https://keyking.ledgion.in/guides/claude-code)
+- [KeyKing AI vs LiteLLM](https://keyking.ledgion.in/compare/litellm)
+- [Machine-readable LLM context](https://keyking.ledgion.in/llms.txt)
 
-Install the SDK into your Node.js or Next.js project:
+## Contributing
 
-```bash
-npm install keyking-sdk
-```
+Issues and pull requests are welcome. Please avoid including real credentials, vault passwords, or private request content in reports and test fixtures.
 
-The published SDK package name is `keyking-sdk`.
-
-Decrypt your vault on the fly in your serverless functions or edge middleware:
-
-```typescript
-import { KeyKing } from 'keyking-sdk';
-
-// Initialize with your single Master Password
-const kk = new KeyKing(process.env.KEYKING_MASTER_PASSWORD);
-
-// Load the encrypted vault and retrieve your key
-const vault = await kk.loadVault('./secure.vault');
-const openaiKey = vault.getKey('OPENAI_API_KEY');
-
-console.log('Securely retrieved key at the edge! 🚀');
-```
-
----
-
-<div align="center">
-  <i>Built with 🛡️ by the KeyKing Team.</i>
-</div>
+<div align="center"><strong>KeyKing AI — your AI keys, one local endpoint, automatic fallback.</strong></div>
