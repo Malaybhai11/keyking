@@ -11,6 +11,57 @@ use std::sync::Arc;
 
 use crate::proxy::{NormalizedRequest, router::ProxyRouter};
 
+/// Anthropic `tool_result.content` is either a plain string or an array of
+/// content blocks. Claude Code sends the array form, so reading it with
+/// `as_str()` alone silently turned every tool result into an empty string and
+/// the model never saw what the tool returned.
+fn stringify_tool_result_content(content: Option<&serde_json::Value>) -> String {
+    match content {
+        None | Some(serde_json::Value::Null) => String::new(),
+        Some(serde_json::Value::String(text)) => text.clone(),
+        Some(serde_json::Value::Array(blocks)) => {
+            let mut out = String::new();
+            for block in blocks {
+                if block.get("type").and_then(|t| t.as_str()) == Some("text") {
+                    if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                        out.push_str(text);
+                    }
+                } else {
+                    // Images and other non-text results have no OpenAI
+                    // tool-message equivalent. Keep the raw JSON so the model
+                    // still sees that something came back.
+                    out.push_str(&block.to_string());
+                }
+            }
+            out
+        }
+        Some(other) => other.to_string(),
+    }
+}
+
+/// Thinking-capable providers expect reasoning history only on the most recent
+/// assistant turn. Several reject a payload that also carries reasoning from
+/// earlier turns with HTTP 400, so keep the newest one and drop the rest.
+///
+/// If a provider ever turns out to require reasoning on every assistant
+/// tool-call turn, deleting this call restores the send-everything behaviour.
+fn retain_latest_reasoning_only(messages: &mut [serde_json::Value]) {
+    let latest = messages
+        .iter()
+        .rposition(|message| message.get("reasoning_content").is_some());
+
+    if let Some(latest) = latest {
+        for (index, message) in messages.iter_mut().enumerate() {
+            if index == latest {
+                continue;
+            }
+            if let Some(object) = message.as_object_mut() {
+                object.remove("reasoning_content");
+            }
+        }
+    }
+}
+
 /// Converts Anthropic message content blocks into OpenAI-compatible chat
 /// messages. Thinking-capable providers require their reasoning from an
 /// assistant tool-call turn to be included when its tool result is submitted.
@@ -23,7 +74,7 @@ fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::V
         let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
         if let Some(content_arr) = msg.get("content").and_then(|c| c.as_array()) {
             let mut text_content = String::new();
-            let mut reasoning_content = String::new();
+            let mut reasoning_parts: Vec<String> = Vec::new();
             let mut tool_calls = Vec::new();
             let mut is_tool_result = false;
 
@@ -35,8 +86,15 @@ fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::V
                     }
                 } else if ctype == "thinking" {
                     if let Some(t) = item.get("thinking").and_then(|t| t.as_str()) {
-                        reasoning_content.push_str(t);
+                        if !t.is_empty() {
+                            reasoning_parts.push(t.to_string());
+                        }
                     }
+                } else if ctype == "redacted_thinking" {
+                    // Encrypted provider-owned payload with no OpenAI equivalent.
+                    // Dropping it is safe: the native Anthropic route rebuilds its
+                    // own blocks from text/tool_calls and never reads this field,
+                    // so no unsigned thinking is ever forwarded upstream.
                 } else if ctype == "tool_use" {
                     let mut id = item.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
                     if id.starts_with("toolu_call_") {
@@ -58,7 +116,7 @@ fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::V
                     if tool_use_id.starts_with("toolu_call_") {
                         tool_use_id = tool_use_id.replace("toolu_", "");
                     }
-                    let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+                    let content = stringify_tool_result_content(item.get("content"));
                     messages.push(json!({
                         "role": "tool",
                         "tool_call_id": tool_use_id,
@@ -71,15 +129,24 @@ fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::V
                 continue;
             }
 
-            let mut final_msg = json!({
-                "role": role,
-                "content": text_content
-            });
+            // An assistant turn that is only a tool call has no text. The OpenAI
+            // schema wants null there, and strict upstreams reject "".
+            let mut final_msg = if role == "assistant" && text_content.is_empty() && !tool_calls.is_empty() {
+                json!({
+                    "role": role,
+                    "content": serde_json::Value::Null
+                })
+            } else {
+                json!({
+                    "role": role,
+                    "content": text_content
+                })
+            };
 
-            if role == "assistant" && !reasoning_content.is_empty() {
+            if role == "assistant" && !reasoning_parts.is_empty() {
                 final_msg.as_object_mut().unwrap().insert(
                     "reasoning_content".to_string(),
-                    serde_json::Value::String(reasoning_content),
+                    serde_json::Value::String(reasoning_parts.join("\n\n")),
                 );
             }
             if !tool_calls.is_empty() {
@@ -93,6 +160,8 @@ fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::V
             }));
         }
     }
+
+    retain_latest_reasoning_only(&mut messages);
 
     messages
 }
@@ -827,5 +896,90 @@ mod tests {
         let translated = translate_anthropic_messages(&messages);
 
         assert!(translated[0].get("reasoning_content").is_none());
+    }
+
+    #[test]
+    fn reads_tool_result_content_sent_as_block_array() {
+        let messages = vec![json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": "toolu_call_01",
+                "content": [
+                    {"type": "text", "text": "first line\n"},
+                    {"type": "text", "text": "second line"}
+                ]
+            }]
+        })];
+
+        let translated = translate_anthropic_messages(&messages);
+
+        assert_eq!(translated[0]["role"], "tool");
+        assert_eq!(translated[0]["content"], "first line\nsecond line");
+    }
+
+    #[test]
+    fn uses_null_content_for_tool_call_only_assistant_turn() {
+        let messages = vec![json!({
+            "role": "assistant",
+            "content": [{
+                "type": "tool_use",
+                "id": "toolu_call_01",
+                "name": "read_file",
+                "input": {"path": "src/main.rs"}
+            }]
+        })];
+
+        let translated = translate_anthropic_messages(&messages);
+
+        assert!(translated[0]["content"].is_null());
+        assert_eq!(translated[0]["tool_calls"][0]["function"]["name"], "read_file");
+    }
+
+    #[test]
+    fn keeps_reasoning_only_for_the_latest_assistant_turn() {
+        let messages = vec![
+            json!({
+                "role": "assistant",
+                "content": [
+                    {"type": "thinking", "thinking": "first round"},
+                    {"type": "tool_use", "id": "toolu_call_01", "name": "read_file", "input": {}}
+                ]
+            }),
+            json!({
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "toolu_call_01", "content": "ok"}]
+            }),
+            json!({
+                "role": "assistant",
+                "content": [
+                    {"type": "thinking", "thinking": "second round"},
+                    {"type": "tool_use", "id": "toolu_call_02", "name": "read_file", "input": {}}
+                ]
+            }),
+        ];
+
+        let translated = translate_anthropic_messages(&messages);
+
+        assert!(translated[0].get("reasoning_content").is_none());
+        assert_eq!(translated[2]["reasoning_content"], "second round");
+    }
+
+    #[test]
+    fn joins_multiple_thinking_blocks_and_ignores_redacted_thinking() {
+        let messages = vec![json!({
+            "role": "assistant",
+            "content": [
+                {"type": "thinking", "thinking": "step one", "signature": "sig-a"},
+                {"type": "redacted_thinking", "data": "encrypted-blob"},
+                {"type": "thinking", "thinking": "step two"},
+                {"type": "text", "text": "done"}
+            ]
+        })];
+
+        let translated = translate_anthropic_messages(&messages);
+
+        assert_eq!(translated[0]["reasoning_content"], "step one\n\nstep two");
+        assert_eq!(translated[0]["content"], "done");
     }
 }
