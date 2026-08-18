@@ -11,6 +11,92 @@ use std::sync::Arc;
 
 use crate::proxy::{NormalizedRequest, router::ProxyRouter};
 
+/// Converts Anthropic message content blocks into OpenAI-compatible chat
+/// messages. Thinking-capable providers require their reasoning from an
+/// assistant tool-call turn to be included when its tool result is submitted.
+/// Keep that data as `reasoning_content` instead of treating it as display-only
+/// Anthropic content.
+fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    let mut messages = Vec::new();
+
+    for msg in msgs {
+        let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
+        if let Some(content_arr) = msg.get("content").and_then(|c| c.as_array()) {
+            let mut text_content = String::new();
+            let mut reasoning_content = String::new();
+            let mut tool_calls = Vec::new();
+            let mut is_tool_result = false;
+
+            for item in content_arr {
+                let ctype = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                if ctype == "text" {
+                    if let Some(t) = item.get("text").and_then(|t| t.as_str()) {
+                        text_content.push_str(t);
+                    }
+                } else if ctype == "thinking" {
+                    if let Some(t) = item.get("thinking").and_then(|t| t.as_str()) {
+                        reasoning_content.push_str(t);
+                    }
+                } else if ctype == "tool_use" {
+                    let mut id = item.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+                    if id.starts_with("toolu_call_") {
+                        id = id.replace("toolu_", "");
+                    }
+                    let name = item.get("name").cloned().unwrap_or_default();
+                    let input = item.get("input").cloned().unwrap_or(json!({}));
+                    tool_calls.push(json!({
+                        "id": id,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": input.to_string()
+                        }
+                    }));
+                } else if ctype == "tool_result" {
+                    is_tool_result = true;
+                    let mut tool_use_id = item.get("tool_use_id").and_then(|t| t.as_str()).unwrap_or("").to_string();
+                    if tool_use_id.starts_with("toolu_call_") {
+                        tool_use_id = tool_use_id.replace("toolu_", "");
+                    }
+                    let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+                    messages.push(json!({
+                        "role": "tool",
+                        "tool_call_id": tool_use_id,
+                        "content": content
+                    }));
+                }
+            }
+
+            if is_tool_result {
+                continue;
+            }
+
+            let mut final_msg = json!({
+                "role": role,
+                "content": text_content
+            });
+
+            if role == "assistant" && !reasoning_content.is_empty() {
+                final_msg.as_object_mut().unwrap().insert(
+                    "reasoning_content".to_string(),
+                    serde_json::Value::String(reasoning_content),
+                );
+            }
+            if !tool_calls.is_empty() {
+                final_msg.as_object_mut().unwrap().insert("tool_calls".to_string(), serde_json::Value::Array(tool_calls));
+            }
+            messages.push(final_msg);
+        } else if let Some(content_str) = msg.get("content").and_then(|c| c.as_str()) {
+            messages.push(json!({
+                "role": role,
+                "content": content_str
+            }));
+        }
+    }
+
+    messages
+}
+
 pub async fn handle_anthropic_messages(
     State(router): State<Arc<ProxyRouter>>,
     req_body: axum::extract::Json<serde_json::Value>,
@@ -38,69 +124,7 @@ pub async fn handle_anthropic_messages(
     }
     
     if let Some(msgs) = raw.get("messages").and_then(|m| m.as_array()) {
-        for msg in msgs {
-            let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
-            if let Some(content_arr) = msg.get("content").and_then(|c| c.as_array()) {
-                let mut text_content = String::new();
-                let mut tool_calls = Vec::new();
-                let mut is_tool_result = false;
-                
-                for item in content_arr {
-                    let ctype = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    if ctype == "text" {
-                        if let Some(t) = item.get("text").and_then(|t| t.as_str()) {
-                            text_content.push_str(t);
-                        }
-                    } else if ctype == "tool_use" {
-                        let mut id = item.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
-                        if id.starts_with("toolu_call_") {
-                            id = id.replace("toolu_", "");
-                        }
-                        let name = item.get("name").cloned().unwrap_or_default();
-                        let input = item.get("input").cloned().unwrap_or(json!({}));
-                        tool_calls.push(json!({
-                            "id": id,
-                            "type": "function",
-                            "function": {
-                                "name": name,
-                                "arguments": input.to_string()
-                            }
-                        }));
-                    } else if ctype == "tool_result" {
-                        is_tool_result = true;
-                        let mut tool_use_id = item.get("tool_use_id").and_then(|t| t.as_str()).unwrap_or("").to_string();
-                        if tool_use_id.starts_with("toolu_call_") {
-                            tool_use_id = tool_use_id.replace("toolu_", "");
-                        }
-                        let content = item.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
-                        messages.push(json!({
-                            "role": "tool",
-                            "tool_call_id": tool_use_id,
-                            "content": content
-                        }));
-                    }
-                }
-                
-                if is_tool_result {
-                    continue;
-                }
-                
-                let mut final_msg = json!({
-                    "role": role,
-                    "content": text_content
-                });
-                
-                if !tool_calls.is_empty() {
-                    final_msg.as_object_mut().unwrap().insert("tool_calls".to_string(), serde_json::Value::Array(tool_calls));
-                }
-                messages.push(final_msg);
-            } else if let Some(content_str) = msg.get("content").and_then(|c| c.as_str()) {
-                messages.push(json!({
-                    "role": role,
-                    "content": content_str
-                }));
-            }
-        }
+        messages.extend(translate_anthropic_messages(msgs));
     }
     
     let original_model = raw.get("model").and_then(|m| m.as_str()).unwrap_or("claude-3-7-sonnet-20250219").to_string();
@@ -181,9 +205,20 @@ pub async fn handle_anthropic_messages(
         }
         
         let openai_resp: serde_json::Value = response.json().await.unwrap_or_else(|_| json!({}));
-        let content = openai_resp["choices"][0]["message"]["content"].as_str().unwrap_or("");
+        let upstream_message = &openai_resp["choices"][0]["message"];
+        let content = upstream_message["content"].as_str().unwrap_or("");
         
         let mut anthropic_content = Vec::new();
+        if let Some(reasoning) = upstream_message.get("reasoning_content")
+            .or_else(|| upstream_message.get("thinking"))
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.is_empty())
+        {
+            anthropic_content.push(json!({
+                "type": "thinking",
+                "thinking": reasoning
+            }));
+        }
         if !content.is_empty() {
             anthropic_content.push(json!({
                 "type": "text",
@@ -742,4 +777,55 @@ pub async fn handle_anthropic_messages(
             .text("keep-alive")
     )
     .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::translate_anthropic_messages;
+    use serde_json::json;
+
+    #[test]
+    fn preserves_thinking_for_assistant_tool_call_history() {
+        let messages = vec![
+            json!({
+                "role": "assistant",
+                "content": [
+                    {"type": "thinking", "thinking": "I should inspect the project first."},
+                    {"type": "text", "text": "I'll inspect the project."},
+                    {
+                        "type": "tool_use",
+                        "id": "toolu_call_01",
+                        "name": "read_file",
+                        "input": {"path": "src/main.rs"}
+                    }
+                ]
+            }),
+            json!({
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "toolu_call_01", "content": "fn main() {}"}
+                ]
+            }),
+        ];
+
+        let translated = translate_anthropic_messages(&messages);
+
+        assert_eq!(translated[0]["role"], "assistant");
+        assert_eq!(translated[0]["reasoning_content"], "I should inspect the project first.");
+        assert_eq!(translated[0]["tool_calls"][0]["id"], "call_01");
+        assert_eq!(translated[1]["role"], "tool");
+        assert_eq!(translated[1]["tool_call_id"], "call_01");
+    }
+
+    #[test]
+    fn omits_reasoning_content_when_no_thinking_block_exists() {
+        let messages = vec![json!({
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Hello"}]
+        })];
+
+        let translated = translate_anthropic_messages(&messages);
+
+        assert!(translated[0].get("reasoning_content").is_none());
+    }
 }
