@@ -39,25 +39,25 @@ fn stringify_tool_result_content(content: Option<&serde_json::Value>) -> String 
     }
 }
 
-/// Thinking-capable providers expect reasoning history only on the most recent
-/// assistant turn. Several reject a payload that also carries reasoning from
-/// earlier turns with HTTP 400, so keep the newest one and drop the rest.
-///
-/// If a provider ever turns out to require reasoning on every assistant
-/// tool-call turn, deleting this call restores the send-everything behaviour.
+/// Thinking-capable providers expect reasoning history on tool-call turns or on the most recent
+/// assistant turn. Non-tool assistant turns can have reasoning dropped from earlier turns,
+/// but tool-call turns MUST retain reasoning_content or providers like TokenRouter / Moonshot / DeepSeek
+/// reject the payload with HTTP 400 ("messages[i].reasoning_content is required for thinking tool-call history").
 fn retain_latest_reasoning_only(messages: &mut [serde_json::Value]) {
     let latest = messages
         .iter()
         .rposition(|message| message.get("reasoning_content").is_some());
 
-    if let Some(latest) = latest {
-        for (index, message) in messages.iter_mut().enumerate() {
-            if index == latest {
-                continue;
-            }
-            if let Some(object) = message.as_object_mut() {
-                object.remove("reasoning_content");
-            }
+    for (index, message) in messages.iter_mut().enumerate() {
+        let has_tool_calls = message
+            .get("tool_calls")
+            .and_then(|tc| tc.as_array())
+            .map_or(false, |a| !a.is_empty());
+        if index == latest.unwrap_or(usize::MAX) || has_tool_calls {
+            continue;
+        }
+        if let Some(object) = message.as_object_mut() {
+            object.remove("reasoning_content");
         }
     }
 }
@@ -148,6 +148,11 @@ fn translate_anthropic_messages(msgs: &[serde_json::Value]) -> Vec<serde_json::V
                     "reasoning_content".to_string(),
                     serde_json::Value::String(reasoning_parts.join("\n\n")),
                 );
+            } else if role == "assistant" && !tool_calls.is_empty() {
+                final_msg.as_object_mut().unwrap().insert(
+                    "reasoning_content".to_string(),
+                    serde_json::Value::String(String::new()),
+                );
             }
             if !tool_calls.is_empty() {
                 final_msg.as_object_mut().unwrap().insert("tool_calls".to_string(), serde_json::Value::Array(tool_calls));
@@ -222,7 +227,8 @@ pub async fn handle_anthropic_messages(
         for tool in tools {
             let name = tool.get("name").cloned().unwrap_or_default();
             let description = tool.get("description").cloned().unwrap_or_default();
-            let input_schema = tool.get("input_schema").cloned().unwrap_or(json!({"type": "object"}));
+            let mut input_schema = tool.get("input_schema").cloned().unwrap_or(json!({"type": "object"}));
+            crate::proxy::router::sanitize_json_schema(&mut input_schema);
             
             mapped_tools.push(json!({
                 "type": "function",
@@ -937,12 +943,23 @@ mod tests {
     }
 
     #[test]
-    fn keeps_reasoning_only_for_the_latest_assistant_turn() {
+    fn keeps_reasoning_for_tool_call_turns_and_drops_for_earlier_plain_text_turns() {
         let messages = vec![
             json!({
                 "role": "assistant",
                 "content": [
-                    {"type": "thinking", "thinking": "first round"},
+                    {"type": "thinking", "thinking": "early thinking"},
+                    {"type": "text", "text": "hello"}
+                ]
+            }),
+            json!({
+                "role": "user",
+                "content": "next prompt"
+            }),
+            json!({
+                "role": "assistant",
+                "content": [
+                    {"type": "thinking", "thinking": "tool thinking"},
                     {"type": "tool_use", "id": "toolu_call_01", "name": "read_file", "input": {}}
                 ]
             }),
@@ -961,8 +978,12 @@ mod tests {
 
         let translated = translate_anthropic_messages(&messages);
 
+        // Plain text earlier assistant turn had its reasoning dropped
         assert!(translated[0].get("reasoning_content").is_none());
-        assert_eq!(translated[2]["reasoning_content"], "second round");
+        // Tool-call turn retains reasoning_content (required by TokenRouter / DeepSeek)
+        assert_eq!(translated[2]["reasoning_content"], "tool thinking");
+        // Latest assistant turn retains reasoning_content
+        assert_eq!(translated[4]["reasoning_content"], "second round");
     }
 
     #[test]

@@ -214,6 +214,153 @@ const REASONING_UNSUPPORTED_PROVIDERS: &[&str] = &[
     "OpenAI", "Gemini", "Groq", "Github", "Cohere", "Mistral", "Anthropic", "Lumos",
 ];
 
+/// Normalizes system messages for OpenAI-compatible providers:
+/// 1. Merges all leading system messages into a single system message at index 0.
+/// 2. If any system message appears after the conversation has begun (after non-system messages),
+///    converts it to a user message with "[System Instructions]: ..." prefix so providers
+///    like TokenRouter / Moonshot / Qwen (which strictly require system messages to be at index 0)
+///    never reject the payload with HTTP 400 "System message must be at the beginning."
+fn normalize_system_messages(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    let mut result = Vec::new();
+    let mut initial_system_parts = Vec::new();
+    let mut seen_non_system = false;
+
+    for msg in messages {
+        let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("user");
+        if role == "system" {
+            let content = match msg.get("content") {
+                Some(serde_json::Value::String(s)) => s.clone(),
+                Some(v) => {
+                    if let Some(arr) = v.as_array() {
+                        let mut text = String::new();
+                        for item in arr {
+                            if let Some(t) = item.get("text").and_then(|t| t.as_str()) {
+                                text.push_str(t);
+                            }
+                        }
+                        text
+                    } else {
+                        v.to_string()
+                    }
+                }
+                None => String::new(),
+            };
+            if !seen_non_system {
+                if !content.trim().is_empty() {
+                    initial_system_parts.push(content);
+                }
+            } else {
+                let mut converted = msg.clone();
+                if let Some(obj) = converted.as_object_mut() {
+                    obj.insert("role".to_string(), serde_json::json!("user"));
+                    obj.insert("content".to_string(), serde_json::json!(format!("[System Instructions]: {}", content)));
+                }
+                result.push(converted);
+            }
+        } else {
+            seen_non_system = true;
+            result.push(msg.clone());
+        }
+    }
+
+    if !initial_system_parts.is_empty() {
+        let merged_system = serde_json::json!({
+            "role": "system",
+            "content": initial_system_parts.join("\n\n")
+        });
+        result.insert(0, merged_system);
+    }
+
+    result
+}
+
+/// Sanitizes JSON Schema objects for OpenAI-compatible providers:
+/// 1. Removes `{"type": "null"}` from `anyOf`/`oneOf`/`allOf` and flattens single-element unions.
+/// 2. Converts array types like `["string", "null"]` to the primary non-null type.
+/// 3. Normalizes `type: "null"` to `type: "string"`.
+/// 4. Recursively cleans `properties`, `items`, `definitions`, `$defs`, `additionalProperties`.
+pub fn sanitize_json_schema(schema: &mut serde_json::Value) {
+    match schema {
+        serde_json::Value::Object(obj) => {
+            // 1. Array type ["string", "null"] -> "string"
+            if let Some(types) = obj.get("type").and_then(|t| t.as_array()) {
+                let first_non_null = types.iter().find(|t| t.as_str() != Some("null"));
+                if let Some(valid_type) = first_non_null {
+                    obj.insert("type".to_string(), valid_type.clone());
+                } else {
+                    obj.insert("type".to_string(), serde_json::json!("string"));
+                }
+            } else if obj.get("type").and_then(|t| t.as_str()) == Some("null") {
+                obj.insert("type".to_string(), serde_json::json!("string"));
+            }
+
+            // 2. anyOf / oneOf / allOf
+            for key in ["anyOf", "oneOf", "allOf"] {
+                if let Some(arr) = obj.get_mut(key).and_then(|v| v.as_array_mut()) {
+                    for item in arr.iter_mut() {
+                        sanitize_json_schema(item);
+                    }
+                    arr.retain(|item| {
+                        if let Some(item_obj) = item.as_object() {
+                            if item_obj.get("type").and_then(|t| t.as_str()) == Some("null") && item_obj.len() == 1 {
+                                return false;
+                            }
+                        }
+                        true
+                    });
+                    if arr.len() == 1 {
+                        let single = arr.remove(0);
+                        obj.remove(key);
+                        if let Some(single_obj) = single.as_object() {
+                            for (k, v) in single_obj {
+                                if !obj.contains_key(k) {
+                                    obj.insert(k.clone(), v.clone());
+                                }
+                            }
+                        }
+                    } else if arr.is_empty() {
+                        obj.remove(key);
+                    }
+                }
+            }
+
+            // 3. properties
+            if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
+                for (_, prop_schema) in props.iter_mut() {
+                    sanitize_json_schema(prop_schema);
+                }
+            }
+
+            // 4. definitions, $defs, patternProperties
+            for sub_key in ["definitions", "$defs", "patternProperties"] {
+                if let Some(sub_obj) = obj.get_mut(sub_key).and_then(|p| p.as_object_mut()) {
+                    for (_, sub_schema) in sub_obj.iter_mut() {
+                        sanitize_json_schema(sub_schema);
+                    }
+                }
+            }
+
+            // 5. items
+            if let Some(items) = obj.get_mut("items") {
+                sanitize_json_schema(items);
+            }
+
+            // 6. additionalProperties
+            if let Some(add_props) = obj.get_mut("additionalProperties") {
+                if add_props.is_object() {
+                    sanitize_json_schema(add_props);
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                sanitize_json_schema(item);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Drops `reasoning_content` from every message for providers that reject it.
 /// Providers not on the deny list keep the field, which is what lets
 /// thinking-capable upstreams resume a tool-call turn correctly.
@@ -221,17 +368,35 @@ fn sanitize_messages_for_provider(
     provider: &str,
     messages: &[serde_json::Value],
 ) -> Vec<serde_json::Value> {
+    let normalized = normalize_system_messages(messages);
+
     if !REASONING_UNSUPPORTED_PROVIDERS.contains(&provider) {
-        return messages.to_vec();
+        // Thinking-capable providers (TokenRouter, DeepSeek, SiliconFlow, ModelScope, Zai, etc.)
+        // strictly require reasoning_content on ANY assistant message that contains tool_calls.
+        return normalized
+            .into_iter()
+            .map(|mut msg| {
+                if let Some(obj) = msg.as_object_mut() {
+                    let role = obj.get("role").and_then(|r| r.as_str()).unwrap_or("");
+                    let has_tool_calls = obj
+                        .get("tool_calls")
+                        .and_then(|t| t.as_array())
+                        .map_or(false, |a| !a.is_empty());
+                    if role == "assistant" && has_tool_calls && !obj.contains_key("reasoning_content") {
+                        obj.insert("reasoning_content".to_string(), serde_json::Value::String(String::new()));
+                    }
+                }
+                msg
+            })
+            .collect();
     }
-    messages
-        .iter()
-        .map(|message| {
-            let mut sanitized = message.clone();
-            if let Some(object) = sanitized.as_object_mut() {
+    normalized
+        .into_iter()
+        .map(|mut msg| {
+            if let Some(object) = msg.as_object_mut() {
                 object.remove("reasoning_content");
             }
-            sanitized
+            msg
         })
         .collect()
 }
@@ -405,27 +570,74 @@ impl ProxyRouter {
         }
     }
 
-    /// Drops fields Google's OpenAI-compatibility layer rejects with a 400.
-    /// MUST run after the `extra` passthrough merge, because clients (OpenClaw,
-    /// Continue, the OpenAI SDK) inject `store`, `logprobs` and friends there.
+    /// Drops fields providers reject with 400/422.
+    /// MUST run after the `extra` passthrough merge, because clients (Claude Code,
+    /// Codex, OpenClaw, Continue) inject `store`, `logprobs`, `parallel_tool_calls`,
+    /// `strict`, etc.
     fn sanitize_provider_body(provider: &str, body: &mut serde_json::Value) {
-        if provider != "Gemini" {
-            return;
-        }
-        if let Some(obj) = body.as_object_mut() {
-            obj.retain(|k, _| !GEMINI_UNSUPPORTED_FIELDS.contains(&k.as_str()));
+        if provider == "Gemini" {
+            if let Some(obj) = body.as_object_mut() {
+                obj.retain(|k, _| !GEMINI_UNSUPPORTED_FIELDS.contains(&k.as_str()));
+            }
+        } else if provider == "TokenRouter" || provider == "Groq" {
+            if let Some(obj) = body.as_object_mut() {
+                obj.remove("parallel_tool_calls");
+                if let Some(tc) = obj.get("tool_choice") {
+                    if tc == "required" || tc.is_object() {
+                        obj.insert("tool_choice".to_string(), serde_json::json!("auto"));
+                    }
+                }
+                if let Some(tools) = obj.get_mut("tools").and_then(|t| t.as_array_mut()) {
+                    for tool in tools {
+                        if let Some(func) = tool.get_mut("function").and_then(|f| f.as_object_mut()) {
+                            func.remove("strict");
+                            if let Some(params) = func.get_mut("parameters") {
+                                sanitize_json_schema(params);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if let Some(obj) = body.as_object_mut() {
+            if let Some(tools) = obj.get_mut("tools").and_then(|t| t.as_array_mut()) {
+                for tool in tools {
+                    if let Some(func) = tool.get_mut("function").and_then(|f| f.as_object_mut()) {
+                        if let Some(params) = func.get_mut("parameters") {
+                            sanitize_json_schema(params);
+                        }
+                    }
+                }
+            }
         }
     }
 
     /// Same sanitization for the non-streaming path, which sends a typed
     /// NormalizedRequest through the OpenAI adapter rather than a json! body.
     fn sanitize_provider_request(provider: &str, req: &mut NormalizedRequest) {
-        if provider != "Gemini" {
-            return;
+        if provider == "Gemini" {
+            req.frequency_penalty = None;
+            req.presence_penalty = None;
+            req.extra.retain(|k, _| !GEMINI_UNSUPPORTED_FIELDS.contains(&k.as_str()));
+        } else if provider == "TokenRouter" || provider == "Groq" {
+            req.extra.remove("parallel_tool_calls");
+            if let Some(tc) = req.extra.get("tool_choice") {
+                if tc == "required" || tc.is_object() {
+                    req.extra.insert("tool_choice".to_string(), serde_json::json!("auto"));
+                }
+            }
         }
-        req.frequency_penalty = None;
-        req.presence_penalty = None;
-        req.extra.retain(|k, _| !GEMINI_UNSUPPORTED_FIELDS.contains(&k.as_str()));
+        if let Some(tools) = req.extra.get_mut("tools").and_then(|t| t.as_array_mut()) {
+            for tool in tools {
+                if let Some(func) = tool.get_mut("function").and_then(|f| f.as_object_mut()) {
+                    if provider == "TokenRouter" || provider == "Groq" {
+                        func.remove("strict");
+                    }
+                    if let Some(params) = func.get_mut("parameters") {
+                        sanitize_json_schema(params);
+                    }
+                }
+            }
+        }
     }
 
     /// Resolves the model ID a specific provider expects for this request.
@@ -1246,5 +1458,67 @@ mod tests {
         let sanitized = sanitize_messages_for_provider("Chutes", &messages);
 
         assert_eq!(sanitized[0]["reasoning_content"], "because");
+    }
+
+    #[test]
+    fn populates_empty_reasoning_content_for_assistant_tool_calls_on_thinking_providers() {
+        let messages = vec![json!({
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "read", "arguments": "{}"}}]
+        })];
+
+        let sanitized = sanitize_messages_for_provider("TokenRouter", &messages);
+
+        assert_eq!(sanitized[0]["reasoning_content"], "");
+    }
+
+    #[test]
+    fn merges_multiple_initial_system_messages_and_converts_mid_conversation_system_messages() {
+        let messages = vec![
+            json!({"role": "system", "content": "Instruction 1"}),
+            json!({"role": "system", "content": "Instruction 2"}),
+            json!({"role": "user", "content": "Hello"}),
+            json!({"role": "assistant", "content": "Hi"}),
+            json!({"role": "system", "content": "Subagent directive"}),
+            json!({"role": "user", "content": "Do task"}),
+        ];
+
+        let sanitized = sanitize_messages_for_provider("TokenRouter", &messages);
+
+        assert_eq!(sanitized.len(), 5);
+        assert_eq!(sanitized[0]["role"], "system");
+        assert_eq!(sanitized[0]["content"], "Instruction 1\n\nInstruction 2");
+        assert_eq!(sanitized[1]["role"], "user");
+        assert_eq!(sanitized[2]["role"], "assistant");
+        assert_eq!(sanitized[3]["role"], "user");
+        assert_eq!(sanitized[3]["content"], "[System Instructions]: Subagent directive");
+        assert_eq!(sanitized[4]["role"], "user");
+    }
+
+    #[test]
+    fn sanitizes_nullable_and_anyof_in_json_schema() {
+        use super::sanitize_json_schema;
+
+        let mut schema = json!({
+            "type": "object",
+            "properties": {
+                "start_time": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "null"}
+                    ]
+                },
+                "status": {
+                    "type": ["string", "null"]
+                }
+            }
+        });
+
+        sanitize_json_schema(&mut schema);
+
+        assert_eq!(schema["properties"]["start_time"]["type"], "string");
+        assert!(schema["properties"]["start_time"].get("anyOf").is_none());
+        assert_eq!(schema["properties"]["status"]["type"], "string");
     }
 }

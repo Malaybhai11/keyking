@@ -216,6 +216,8 @@ fn static_catalog(provider: &str) -> Vec<&'static str> {
             "gpt-5.5",
         ],
         "TokenRouter" => vec![
+            "qwen/qwen3.8-max-free",
+            "deepseek/deepseek-v4-pro-0813-free",
             "moonshotai/kimi-k3-free",
             "kimi-k3-free",
         ],

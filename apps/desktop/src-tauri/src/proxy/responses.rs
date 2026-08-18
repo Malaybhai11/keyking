@@ -761,9 +761,11 @@ fn map_responses_tool(
             "additionalProperties": false
         })
     } else {
-        tool.get("parameters")
+        let mut p = tool.get("parameters")
             .cloned()
-            .unwrap_or_else(|| json!({"type": "object", "properties": {}}))
+            .unwrap_or_else(|| json!({"type": "object", "properties": {}}));
+        crate::proxy::router::sanitize_json_schema(&mut p);
+        p
     };
 
     let mut mapped = json!({
