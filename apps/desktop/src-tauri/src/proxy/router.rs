@@ -204,6 +204,38 @@ const GEMINI_UNSUPPORTED_FIELDS: &[&str] = &[
     "parallel_tool_calls",
 ];
 
+/// Providers whose OpenAI-compatible endpoint rejects unknown per-message fields
+/// with a 400. `reasoning_content` (set by proxy/anthropic.rs so thinking-aware
+/// upstreams can continue a tool-call turn) is meaningless to them, and a 400
+/// here is deterministic: it would fail over through every provider before the
+/// caller sees an error. Anthropic and Lumos are listed for clarity — their
+/// adapter rebuilds native Anthropic blocks and ignores the field anyway.
+const REASONING_UNSUPPORTED_PROVIDERS: &[&str] = &[
+    "OpenAI", "Gemini", "Groq", "Github", "Cohere", "Mistral", "Anthropic", "Lumos",
+];
+
+/// Drops `reasoning_content` from every message for providers that reject it.
+/// Providers not on the deny list keep the field, which is what lets
+/// thinking-capable upstreams resume a tool-call turn correctly.
+fn sanitize_messages_for_provider(
+    provider: &str,
+    messages: &[serde_json::Value],
+) -> Vec<serde_json::Value> {
+    if !REASONING_UNSUPPORTED_PROVIDERS.contains(&provider) {
+        return messages.to_vec();
+    }
+    messages
+        .iter()
+        .map(|message| {
+            let mut sanitized = message.clone();
+            if let Some(object) = sanitized.as_object_mut() {
+                object.remove("reasoning_content");
+            }
+            sanitized
+        })
+        .collect()
+}
+
 /// How the router may proceed after a failed upstream attempt.
 #[derive(Debug, Clone, Copy)]
 enum FailAction {
@@ -517,9 +549,13 @@ impl ProxyRouter {
                 }
             }
 
+            // Providers that reject unknown per-message fields must not receive
+            // reasoning_content; a 400 here is deterministic for every key.
+            let effective_messages = sanitize_messages_for_provider(provider, &req.messages);
+
             let mut stream_req = serde_json::json!({
                 "model": effective_model,
-                "messages": req.messages,
+                "messages": effective_messages,
                 "stream": true,
                 "stream_options": { "include_usage": true },
                 "temperature": req.temperature,
@@ -637,6 +673,10 @@ impl ProxyRouter {
             effective_req.model = Self::effective_model_for(provider, &req.model);
             // Strip fields Gemini's compatibility layer rejects with a 400.
             Self::sanitize_provider_request(provider, &mut effective_req);
+            // Strip reasoning_content for providers that reject unknown
+            // per-message fields.
+            let sanitized_messages = sanitize_messages_for_provider(provider, &effective_req.messages);
+            effective_req.messages = sanitized_messages;
             let result = match provider {
                 "Groq" => self.groq.chat(&self.client, &effective_req, &plaintext).await,
                 "Anthropic" | "Lumos" => self.anthropic.chat_custom(&self.client, &effective_req, &plaintext, provider_url(provider)).await,
@@ -828,9 +868,13 @@ impl ProxyRouter {
                     }
                     req_val
                 } else {
+                    // Providers that reject unknown per-message fields must not
+                    // receive reasoning_content.
+                    let effective_messages = sanitize_messages_for_provider(provider.as_str(), &req.messages);
+
                     let mut req_val = serde_json::json!({
                         "model": effective_model,
-                        "messages": req.messages,
+                        "messages": effective_messages,
                         "stream": true,
                         "temperature": req.temperature,
                         "max_tokens": req.max_tokens,
@@ -1045,10 +1089,14 @@ impl ProxyRouter {
                         effective_max_tokens = Some(tokens.min(4096));
                     }
                 }
-                
+
+                // Providers that reject unknown per-message fields must not
+                // receive reasoning_content.
+                let effective_messages = sanitize_messages_for_provider(primary_provider, &req.messages);
+
                 let mut stream_req = serde_json::json!({
                     "model": env_model,
-                    "messages": req.messages,
+                    "messages": effective_messages,
                     "stream": true,
                     "temperature": req.temperature,
                     "max_tokens": effective_max_tokens,
@@ -1096,6 +1144,8 @@ impl ProxyRouter {
                 let mut env_req = req.clone();
                 env_req.model = Self::effective_model_for(primary_provider, &req.model);
                 Self::sanitize_provider_request(primary_provider, &mut env_req);
+                let sanitized_messages = sanitize_messages_for_provider(primary_provider, &env_req.messages);
+                env_req.messages = sanitized_messages;
                 let result = match primary_provider {
                     "Groq" => router.groq.chat(&router.client, &env_req, &env_key).await,
                     "Anthropic" => router.anthropic.chat(&router.client, &env_req, &env_key).await,
@@ -1163,5 +1213,38 @@ impl ProxyRouter {
             ]
         });
         ([("Content-Type", "application/json")], models.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_messages_for_provider;
+    use serde_json::json;
+
+    #[test]
+    fn strips_reasoning_content_for_providers_that_reject_unknown_fields() {
+        let messages = vec![json!({
+            "role": "assistant",
+            "content": "hi",
+            "reasoning_content": "because"
+        })];
+
+        let sanitized = sanitize_messages_for_provider("OpenAI", &messages);
+
+        assert!(sanitized[0].get("reasoning_content").is_none());
+        assert_eq!(sanitized[0]["content"], "hi");
+    }
+
+    #[test]
+    fn keeps_reasoning_content_for_thinking_capable_providers() {
+        let messages = vec![json!({
+            "role": "assistant",
+            "content": "hi",
+            "reasoning_content": "because"
+        })];
+
+        let sanitized = sanitize_messages_for_provider("Chutes", &messages);
+
+        assert_eq!(sanitized[0]["reasoning_content"], "because");
     }
 }
