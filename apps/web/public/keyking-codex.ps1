@@ -11,6 +11,15 @@ if (-not $env:KEYKING_CODEX_API_KEY) {
 if (-not $env:KEYKING_CODEX_BASE_URL) {
     $env:KEYKING_CODEX_BASE_URL = "http://127.0.0.1:8787/v1"
 }
+if (-not $env:OPENAI_API_KEY) {
+    $env:OPENAI_API_KEY = $env:KEYKING_CODEX_API_KEY
+}
+if (-not $env:CODEX_API_KEY) {
+    $env:CODEX_API_KEY = $env:KEYKING_CODEX_API_KEY
+}
+if (-not $env:OPENAI_BASE_URL) {
+    $env:OPENAI_BASE_URL = $env:KEYKING_CODEX_BASE_URL
+}
 
 $providerOverride = "model_providers.keyking={name='KeyKing',base_url='$env:KEYKING_CODEX_BASE_URL',env_key='KEYKING_CODEX_API_KEY',wire_api='responses',requires_openai_auth=false,supports_websockets=false}"
 Write-Host "👑 Routing Codex through KeyKing..."

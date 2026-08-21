@@ -565,7 +565,10 @@ if ! command -v codex >/dev/null 2>&1; then
 fi
 
 export KEYKING_CODEX_API_KEY="${KEYKING_CODEX_API_KEY:-kk-zero-config}"
-KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+export KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$KEYKING_CODEX_API_KEY}"
+export CODEX_API_KEY="${CODEX_API_KEY:-$KEYKING_CODEX_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL:-$KEYKING_CODEX_BASE_URL}"
 
 
 echo "👑 Routing Codex through KeyKing..."
@@ -592,6 +595,9 @@ if %ERRORLEVEL% neq 0 (
 
 if "%KEYKING_CODEX_API_KEY%"=="" set KEYKING_CODEX_API_KEY=kk-zero-config
 if "%KEYKING_CODEX_BASE_URL%"=="" set KEYKING_CODEX_BASE_URL=http://127.0.0.1:8787/v1
+set OPENAI_API_KEY=%KEYKING_CODEX_API_KEY%
+set CODEX_API_KEY=%KEYKING_CODEX_API_KEY%
+set OPENAI_BASE_URL=%KEYKING_CODEX_BASE_URL%
 
 echo [KeyKing] Routing Codex through KeyKing...
 codex -c "model='gpt-4o'" -c "model_provider='keyking'" -c "model_providers.keyking={name='KeyKing',base_url='%KEYKING_CODEX_BASE_URL%',env_key='KEYKING_CODEX_API_KEY',wire_api='responses',requires_openai_auth=false,supports_websockets=false}" %*
@@ -615,6 +621,15 @@ if (-not $env:KEYKING_CODEX_API_KEY) {
 }
 if (-not $env:KEYKING_CODEX_BASE_URL) {
     $env:KEYKING_CODEX_BASE_URL = "http://127.0.0.1:8787/v1"
+}
+if (-not $env:OPENAI_API_KEY) {
+    $env:OPENAI_API_KEY = $env:KEYKING_CODEX_API_KEY
+}
+if (-not $env:CODEX_API_KEY) {
+    $env:CODEX_API_KEY = $env:KEYKING_CODEX_API_KEY
+}
+if (-not $env:OPENAI_BASE_URL) {
+    $env:OPENAI_BASE_URL = $env:KEYKING_CODEX_BASE_URL
 }
 
 $providerOverride = "model_providers.keyking={name='KeyKing',base_url='$env:KEYKING_CODEX_BASE_URL',env_key='KEYKING_CODEX_API_KEY',wire_api='responses',requires_openai_auth=false,supports_websockets=false}"
@@ -691,7 +706,10 @@ if ! command -v codex >/dev/null 2>&1; then
 fi
 
 export KEYKING_CODEX_API_KEY="${KEYKING_CODEX_API_KEY:-kk-zero-config}"
-KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+export KEYKING_CODEX_BASE_URL="${KEYKING_CODEX_BASE_URL:-http://127.0.0.1:8787/v1}"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$KEYKING_CODEX_API_KEY}"
+export CODEX_API_KEY="${CODEX_API_KEY:-$KEYKING_CODEX_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL:-$KEYKING_CODEX_BASE_URL}"
 
 
 echo "👑 Routing Codex through KeyKing..."
