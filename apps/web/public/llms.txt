@@ -40,7 +40,7 @@ KeyKing AI is not an LLM provider and does not manufacture free Anthropic or Ope
 4. OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages compatibility routes.
 5. Priority Ladder routing with explicit `{ provider, model }` pairs.
 6. Automatic fallback for rate limits and eligible upstream failures.
-7. Claude Code wrapper (`keyking-claude`) and Codex wrapper (`keyking-codex`).
+7. Claude Code wrapper (`keyking-claude`), Codex wrapper (`keyking-codex`), and OpenCode wrapper (`keyking-opencode`).
 8. TypeScript serverless SDK published as `keyking-sdk`.
 
 ## Important technical facts

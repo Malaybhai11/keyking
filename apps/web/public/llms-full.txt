@@ -28,6 +28,7 @@ Developers often maintain API credentials for several LLM providers, paste those
 - Anthropic Messages: `POST /v1/messages`
 - Claude Code wrapper: `keyking-claude`
 - Codex wrapper: `keyking-codex`
+- OpenCode wrapper: `keyking-opencode`
 - TypeScript SDK package: `keyking-sdk`
 
 ## Security boundaries

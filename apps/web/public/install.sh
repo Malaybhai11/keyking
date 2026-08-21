@@ -643,8 +643,103 @@ exit $LASTEXITCODE
 EOF
     cp "$TMP_DIR/keyking-codex.ps1" "$CODEX_WRAPPER_PS1"
 
+    # Create OpenCode wrapper (Bash for Git Bash)
+    OPENCODE_WRAPPER_BASH="${WIN_BIN_DIR}/keyking-opencode"
+    cat << 'EOF' > "$TMP_DIR/keyking-opencode"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v opencode >/dev/null 2>&1; then
+    echo "OpenCode CLI not found. Install it first: npm install -g opencode-ai" >&2
+    exit 1
+fi
+
+export KEYKING_OPENCODE_API_KEY="${KEYKING_OPENCODE_API_KEY:-kk-zero-config}"
+export KEYKING_OPENCODE_BASE_URL="${KEYKING_OPENCODE_BASE_URL:-http://127.0.0.1:8787/v1}"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL:-$KEYKING_OPENCODE_BASE_URL}"
+export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-http://127.0.0.1:8787}"
+export OPENCODE_API_KEY="${OPENCODE_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-$KEYKING_OPENCODE_BASE_URL}"
+
+echo "👑 Routing OpenCode through KeyKing..."
+exec opencode "$@"
+EOF
+    cp "$TMP_DIR/keyking-opencode" "$OPENCODE_WRAPPER_BASH"
+    chmod +x "$OPENCODE_WRAPPER_BASH"
+
+    # Create OpenCode wrapper (CMD for command prompt)
+    OPENCODE_WRAPPER_CMD="${WIN_BIN_DIR}/keyking-opencode.cmd"
+    cat << 'EOF' > "$TMP_DIR/keyking-opencode.cmd"
+@echo off
+setlocal
+
+where opencode >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo OpenCode CLI not found. Install it first: npm install -g opencode-ai
+    exit /b 1
+)
+
+if "%KEYKING_OPENCODE_API_KEY%"=="" set KEYKING_OPENCODE_API_KEY=kk-zero-config
+if "%KEYKING_OPENCODE_BASE_URL%"=="" set KEYKING_OPENCODE_BASE_URL=http://127.0.0.1:8787/v1
+set OPENAI_API_KEY=%KEYKING_OPENCODE_API_KEY%
+set OPENAI_BASE_URL=%KEYKING_OPENCODE_BASE_URL%
+set ANTHROPIC_API_KEY=%KEYKING_OPENCODE_API_KEY%
+set ANTHROPIC_BASE_URL=http://127.0.0.1:8787
+set OPENCODE_API_KEY=%KEYKING_OPENCODE_API_KEY%
+set OPENCODE_BASE_URL=%KEYKING_OPENCODE_BASE_URL%
+
+echo [KeyKing] Routing OpenCode through the local gateway...
+opencode %*
+set EXIT_CODE=%ERRORLEVEL%
+endlocal & exit /b %EXIT_CODE%
+EOF
+    cp "$TMP_DIR/keyking-opencode.cmd" "$OPENCODE_WRAPPER_CMD"
+
+    # Create OpenCode wrapper (PS1 for PowerShell)
+    OPENCODE_WRAPPER_PS1="${WIN_BIN_DIR}/keyking-opencode.ps1"
+    cat << 'EOF' > "$TMP_DIR/keyking-opencode.ps1"
+$ErrorActionPreference = "Stop"
+
+if (-not (Get-Command opencode -ErrorAction SilentlyContinue)) {
+    Write-Error "OpenCode CLI not found. Install it first: npm install -g opencode-ai"
+    exit 1
+}
+
+if (-not $env:KEYKING_OPENCODE_API_KEY) {
+    $env:KEYKING_OPENCODE_API_KEY = "kk-zero-config"
+}
+if (-not $env:KEYKING_OPENCODE_BASE_URL) {
+    $env:KEYKING_OPENCODE_BASE_URL = "http://127.0.0.1:8787/v1"
+}
+if (-not $env:OPENAI_API_KEY) {
+    $env:OPENAI_API_KEY = $env:KEYKING_OPENCODE_API_KEY
+}
+if (-not $env:OPENAI_BASE_URL) {
+    $env:OPENAI_BASE_URL = $env:KEYKING_OPENCODE_BASE_URL
+}
+if (-not $env:ANTHROPIC_API_KEY) {
+    $env:ANTHROPIC_API_KEY = $env:KEYKING_OPENCODE_API_KEY
+}
+if (-not $env:ANTHROPIC_BASE_URL) {
+    $env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"
+}
+if (-not $env:OPENCODE_API_KEY) {
+    $env:OPENCODE_API_KEY = $env:KEYKING_OPENCODE_API_KEY
+}
+if (-not $env:OPENCODE_BASE_URL) {
+    $env:OPENCODE_BASE_URL = $env:KEYKING_OPENCODE_BASE_URL
+}
+
+Write-Host "👑 Routing OpenCode through KeyKing..."
+& opencode @args
+exit $LASTEXITCODE
+EOF
+    cp "$TMP_DIR/keyking-opencode.ps1" "$OPENCODE_WRAPPER_PS1"
+
     (sleep 0.5) &
-    spinner "Copying binary and creating Claude wrappers in ${BR_YELLOW}${WIN_BIN_DIR}${RESET}" $!
+    spinner "Copying binary and creating CLI wrappers in ${BR_YELLOW}${WIN_BIN_DIR}${RESET}" $!
 
     echo ""
     echo -e "  ${BR_YELLOW}⚠${RESET}  Please add ${BR_CYAN}${WIN_BIN_DIR}${RESET} to your Windows PATH"
@@ -725,6 +820,35 @@ EOF
         sudo mv "$TMP_DIR/keyking-codex" "$CODEX_WRAPPER"
     fi
     chmod +x "$CODEX_WRAPPER"
+
+    OPENCODE_WRAPPER="${INSTALL_DIR}/keyking-opencode"
+    cat << 'EOF' > "$TMP_DIR/keyking-opencode"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v opencode >/dev/null 2>&1; then
+    echo "OpenCode CLI not found. Install it first: npm install -g opencode-ai" >&2
+    exit 1
+fi
+
+export KEYKING_OPENCODE_API_KEY="${KEYKING_OPENCODE_API_KEY:-kk-zero-config}"
+export KEYKING_OPENCODE_BASE_URL="${KEYKING_OPENCODE_BASE_URL:-http://127.0.0.1:8787/v1}"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL:-$KEYKING_OPENCODE_BASE_URL}"
+export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-http://127.0.0.1:8787}"
+export OPENCODE_API_KEY="${OPENCODE_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-$KEYKING_OPENCODE_BASE_URL}"
+
+echo "👑 Routing OpenCode through KeyKing..."
+exec opencode "$@"
+EOF
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$TMP_DIR/keyking-opencode" "$OPENCODE_WRAPPER"
+    else
+        sudo mv "$TMP_DIR/keyking-opencode" "$OPENCODE_WRAPPER"
+    fi
+    chmod +x "$OPENCODE_WRAPPER"
 fi
 
 (sleep 0.2) &
@@ -809,7 +933,10 @@ echo -e "    ${BR_YELLOW}\$ curl http://localhost:8787/v1/chat/completions \\${R
     ${BR_YELLOW}$ keyking-claude${RESET}
     
   ${BR_YELLOW}  # Use OpenAI Codex with Zero-Config through KeyKing${RESET}
-    ${BR_YELLOW}$ keyking-codex${RESET}"
+    ${BR_YELLOW}$ keyking-codex${RESET}
+
+  ${BR_YELLOW}  # Use OpenCode with Zero-Config through KeyKing${RESET}
+    ${BR_YELLOW}$ keyking-opencode${RESET}"
 echo ""
 
 hr

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v opencode >/dev/null 2>&1; then
+    echo "OpenCode CLI not found. Install it first: npm install -g opencode-ai" >&2
+    exit 1
+fi
+
+export KEYKING_OPENCODE_API_KEY="${KEYKING_OPENCODE_API_KEY:-kk-zero-config}"
+export KEYKING_OPENCODE_BASE_URL="${KEYKING_OPENCODE_BASE_URL:-http://127.0.0.1:8787/v1}"
+export OPENAI_API_KEY="${OPENAI_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export OPENAI_BASE_URL="${OPENAI_BASE_URL:-$KEYKING_OPENCODE_BASE_URL}"
+export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-http://127.0.0.1:8787}"
+export OPENCODE_API_KEY="${OPENCODE_API_KEY:-$KEYKING_OPENCODE_API_KEY}"
+export OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-$KEYKING_OPENCODE_BASE_URL}"
+
+echo "👑 Routing OpenCode through KeyKing..."
+exec opencode "$@"
